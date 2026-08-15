@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootHome"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/tvCurrentProfile"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="当前应用：1生肖投注助手"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tvDate"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="当前日期：-"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <Button
+        android:id="@+id/btnPickDate"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="选择日期" />
+
+    <!-- ✅ 用你原来的按钮名 btnSelectGroup -->
+    <Button
+        android:id="@+id/btnSelectGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="新增 / 选择 4 个生肖（添加到当前大单）" />
+
+    <TextView
+        android:id="@+id/tvSelectedGroups"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="大组列表（0 单）"
+        android:textSize="14sp" />
+
+    <!-- ✅ 订单列表滚动区：最后一单不会被遮挡 -->
+    <ScrollView
+        android:id="@+id/scrollOrders"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:overScrollMode="never"
+        android:paddingBottom="12dp">
+
+        <LinearLayout
+            android:id="@+id/containerOrders"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </ScrollView>
+
+</LinearLayout>

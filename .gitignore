@@ -1,0 +1,26 @@
+*.iml
+.gradle
+/local.properties
+/.idea/
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+*.apk
+*.aab
+*.dm
+/app/release/
+/app/*/release/
+
+# 签名密钥库 / Kotlin 构建缓存
+*.jks
+*.keystore
+.kotlin/

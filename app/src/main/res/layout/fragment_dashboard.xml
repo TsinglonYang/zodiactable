@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootDash"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:paddingBottom="96dp">
+
+    <TextView
+        android:id="@+id/tvCurrentOrder"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="日期：- 当前：-"
+        android:textStyle="bold"
+        android:textSize="16sp" />
+
+    <TextView
+        android:id="@+id/tvYearZodiac"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="当年生肖：根据农历生肖年选择"
+        android:textSize="15sp" />
+
+    <Button
+        android:id="@+id/btnExportImage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="导出当前单表格为图片" />
+
+    <!-- 表头：横向滚动 -->
+    <HorizontalScrollView
+        android:id="@+id/hsvHeader"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:overScrollMode="never"
+        android:scrollbars="none"
+        android:layout_marginTop="10dp">
+
+        <LinearLayout
+            android:id="@+id/headerRow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
+
+    <!-- 表体：横向滚动 + 纵向 RecyclerView -->
+    <HorizontalScrollView
+        android:id="@+id/hsvBody"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:overScrollMode="never"
+        android:scrollbars="none">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvTable"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:overScrollMode="never" />
+    </HorizontalScrollView>
+
+    <TextView
+        android:id="@+id/tvTotalAmount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="总金额：￥0"
+        android:textStyle="bold"
+        android:textSize="16sp" />
+
+</LinearLayout>

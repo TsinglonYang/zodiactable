@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <GridLayout
+        android:id="@+id/gridZodiac"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:columnCount="3"
+        android:padding="12dp">
+
+        <!-- 注意：按钮文字必须与 enum Zodiac 的 name 一致 -->
+        <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:text="鼠"/>
+        <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:text="牛"/>
+        <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:text="虎"/>
+        <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:text="兔"/>
+        <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:text="龙"/>
+        <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:text="蛇"/>
+        <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:text="马"/>
+        <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:text="羊"/>
+        <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:text="猴"/>
+        <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:text="鸡"/>
+        <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:text="狗"/>
+        <Button android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:text="猪"/>
+
+    </GridLayout>
+</ScrollView>

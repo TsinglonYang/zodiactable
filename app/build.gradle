@@ -1,0 +1,126 @@
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    id 'kotlin-kapt'
+}
+
+android {
+    namespace 'com.example.zodiactableapp'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "com.example.zodiactableapp8"
+        minSdk 21
+        targetSdk 36
+        versionCode 1
+        versionName "2.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    flavorDimensions += "edition"
+
+    productFlavors {
+        app1 {
+            dimension "edition"
+            applicationIdSuffix ".app1"
+            resValue "string", "app_name", "生肖投注助手"
+        }
+        app2 {
+            dimension "edition"
+            applicationIdSuffix ".app2"
+            resValue "string", "app_name", "生肖投注助手"
+        }
+        app3 {
+            dimension "edition"
+            applicationIdSuffix ".app3"
+            resValue "string", "app_name", "生肖投注助手"
+        }
+        app4 {
+            dimension "edition"
+            applicationIdSuffix ".app4"
+            resValue "string", "app_name", "生肖投注助手"
+        }
+        app5 {
+            dimension "edition"
+            applicationIdSuffix ".app5"
+            resValue "string", "app_name", "生肖投注助手"
+        }
+        app6 {
+            dimension "edition"
+            applicationIdSuffix ".app6"
+            resValue "string", "app_name", "生肖投注助手"
+        }
+        app7 {
+            dimension "edition"
+            applicationIdSuffix ".app7"
+            resValue "string", "app_name", "生肖投注助手"
+        }
+        app8 {
+            dimension "edition"
+            applicationIdSuffix ".app8"
+            resValue "string", "app_name", "生肖投注助手"
+        }
+        app9 {
+            dimension "edition"
+            applicationIdSuffix ".app9"
+            resValue "string", "app_name", "生肖投注助手"
+        }
+        app10 {
+            dimension "edition"
+            applicationIdSuffix ".app10"
+            resValue "string", "app_name", "生肖投注助手"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+    kotlinOptions {
+        jvmTarget = '11'
+    }
+    buildFeatures {
+        viewBinding true
+    }
+}
+
+kapt {
+    correctErrorTypes = true
+    arguments {
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
+}
+
+
+dependencies {
+
+    implementation libs.androidx.core.ktx
+    implementation libs.androidx.appcompat
+    implementation libs.material
+    implementation libs.androidx.constraintlayout
+    implementation libs.androidx.lifecycle.livedata.ktx
+    implementation libs.androidx.lifecycle.viewmodel.ktx
+    implementation libs.androidx.navigation.fragment.ktx
+    implementation libs.androidx.navigation.ui.ktx
+
+    // ===== Room =====
+    implementation "androidx.room:room-runtime:2.6.1"
+    implementation "androidx.room:room-ktx:2.6.1"
+    kapt "androidx.room:room-compiler:2.6.1"
+
+
+    testImplementation libs.junit
+    androidTestImplementation libs.androidx.junit
+    androidTestImplementation libs.androidx.espresso.core
+
+
+
+
+}
