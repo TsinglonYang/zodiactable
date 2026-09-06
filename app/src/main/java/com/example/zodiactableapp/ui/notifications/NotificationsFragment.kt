@@ -18,6 +18,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.zodiactableapp.R
 import com.example.zodiactableapp.model.Zodiac
+import com.example.zodiactableapp.model.ZodiacNumberTables
 import com.example.zodiactableapp.shared.BetSharedViewModel
 import java.io.File
 import java.io.FileOutputStream
@@ -55,6 +56,10 @@ class NotificationsFragment : Fragment(R.layout.fragment_notifications) {
     private lateinit var btnExport: Button
 
     private lateinit var adapter: SummaryTableAdapter
+
+    // 生肖号码对照表（仅 app1）
+    private lateinit var tvZodiacNumberTitle: TextView
+    private lateinit var zodiacNumberTable: LinearLayout
 
     private val zodiacList = Zodiac.values().toList()
 
@@ -102,6 +107,10 @@ class NotificationsFragment : Fragment(R.layout.fragment_notifications) {
         tvFormulaHint = view.findViewById(R.id.tvFormulaHint)
         tvSummaryProfile = view.findViewById(R.id.tvSummaryProfile)
 
+        tvZodiacNumberTitle = view.findViewById(R.id.tvZodiacNumberTitle)
+        zodiacNumberTable = view.findViewById(R.id.zodiacNumberTable)
+        setupZodiacNumberTable()
+
         // 1) 下拉初始化
         setupYearSpinner()
         setupDrawSpinner()
@@ -114,11 +123,13 @@ class NotificationsFragment : Fragment(R.layout.fragment_notifications) {
         adapter = SummaryTableAdapter(emptyList())
         rvTable.layoutManager = LinearLayoutManager(requireContext())
         rvTable.adapter = adapter
+        rvTable.isNestedScrollingEnabled = false
         syncHorizontalScroll(hsvHeader, hsvBody)
 
         // 4) 监听：日期/订单/开奖变动 → 重新渲染
         sharedVM.currentProfile.observe(viewLifecycleOwner) {
             restoreYearZodiac()
+            setupZodiacNumberTable()
             renderAll()
         }
         sharedVM.selectedDate.observe(viewLifecycleOwner) { renderAll() }
@@ -209,6 +220,7 @@ class NotificationsFragment : Fragment(R.layout.fragment_notifications) {
         val orders = sharedVM.orders.value.orEmpty()
         if (orders.isEmpty()) {
             adapter.submit(emptyList())
+            updateTableHeight(0)
             tvFormulaHint.text = "汇总：当前没有任何大单"
             return
         }
@@ -270,6 +282,7 @@ class NotificationsFragment : Fragment(R.layout.fragment_notifications) {
         )
 
         adapter.submit(rows)
+        updateTableHeight(rows.size)
 
         val subtotalAll = adjustedSubtotalCols.sum()
         val totalAll = totalCols.sum()
@@ -359,6 +372,52 @@ class NotificationsFragment : Fragment(R.layout.fragment_notifications) {
             setBackgroundResource(R.drawable.cell_border)
             setTypeface(typeface, android.graphics.Typeface.BOLD)
             this.text = text
+        }
+    }
+
+    // ====================== 生肖号码对照表（仅 app1） ======================
+
+    private fun setupZodiacNumberTable() {
+        val show = resources.getBoolean(R.bool.show_zodiac_numbers)
+        tvZodiacNumberTitle.visibility = if (show) View.VISIBLE else View.GONE
+        zodiacNumberTable.visibility = if (show) View.VISIBLE else View.GONE
+        if (show) buildZodiacNumberTable()
+    }
+
+    private fun buildZodiacNumberTable() {
+        zodiacNumberTable.removeAllViews()
+        val zodiacs = Zodiac.values().toList()
+        for (r in 0 until 6) {
+            val row = LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.HORIZONTAL
+            }
+            for (c in 0 until 2) {
+                val z = zodiacs[r * 2 + c]
+                val cell = LinearLayout(requireContext()).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = android.view.Gravity.CENTER
+                    setPadding(dp(4), dp(8), dp(4), dp(8))
+                    background = requireContext().getDrawable(R.drawable.cell_border)
+                    layoutParams = LinearLayout.LayoutParams(
+                        0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+                    )
+                }
+                cell.addView(TextView(requireContext()).apply {
+                    text = z.name
+                    textSize = 14f
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                })
+                cell.addView(TextView(requireContext()).apply {
+                    text = ZodiacNumberTables.numbersFor(
+                        z,
+                        ZodiacNumberTables.groupIndexForProfile(sharedVM.getCurrentProfileId())
+                    ).joinToString(" ")
+                    textSize = 15f
+                    setTextColor(Color.rgb(60, 60, 60))
+                })
+                row.addView(cell)
+            }
+            zodiacNumberTable.addView(row)
         }
     }
 
@@ -599,6 +658,14 @@ class NotificationsFragment : Fragment(R.layout.fragment_notifications) {
     // ====================== 工具 ======================
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+    /** 让 RecyclerView 完整显示所有行（每行 48dp），整页由外层 ScrollView 滚动 */
+    private fun updateTableHeight(rowCount: Int) {
+        rvTable.layoutParams = rvTable.layoutParams.apply {
+            height = if (rowCount <= 0) 0 else dp(48) * rowCount
+        }
+        rvTable.requestLayout()
+    }
 
     private fun toast(msg: String) {
         Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()

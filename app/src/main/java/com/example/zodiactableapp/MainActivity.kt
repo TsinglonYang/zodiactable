@@ -1,14 +1,25 @@
 package com.example.zodiactableapp
 
 import android.app.AlertDialog
+import android.content.ContentValues
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.MediaStore
 import android.view.Gravity
 import android.view.View
+import android.widget.Button
 import android.widget.GridLayout
+import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -21,7 +32,14 @@ import androidx.core.view.updatePadding
 import androidx.navigation.findNavController
 import androidx.navigation.ui.setupWithNavController
 import com.example.zodiactableapp.databinding.ActivityMainBinding
+import com.example.zodiactableapp.model.ZodiacNumberTables
 import com.example.zodiactableapp.shared.BetSharedViewModel
+import com.example.zodiactableapp.shared.ProfileSubtotal
+import java.io.File
+import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
@@ -45,6 +63,10 @@ class MainActivity : AppCompatActivity() {
         showProfileLauncher()
         setupBackHandling()
         applyInsets()
+
+        binding.btnNumberValueTable.setOnClickListener {
+            sharedVM.computeAllProfileSubtotals { subtotals -> showNumberValueTable(subtotals) }
+        }
     }
 
     private fun buildProfileLauncher(profileIds: List<Int>) {
@@ -239,6 +261,143 @@ class MainActivity : AppCompatActivity() {
             val sys = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.updatePadding(bottom = sys.bottom)
             insets
+        }
+    }
+
+    private fun showNumberValueTable(subtotals: List<ProfileSubtotal>) {
+        val content = ScrollView(this)
+        val hsv = HorizontalScrollView(this).apply {
+            overScrollMode = View.OVER_SCROLL_NEVER
+        }
+        val table = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+        }
+        hsv.addView(table)
+        content.addView(hsv)
+
+        // 先算好每个档案的 49 个值 + 汇总
+        val profileRows = subtotals.sortedBy { it.profileId }.map { ps ->
+            val group = ZodiacNumberTables.groupIndexForProfile(ps.profileId)
+            val values = (1..49).map { n ->
+                val z = ZodiacNumberTables.zodiacForNumber(n, group)
+                (ps.zodiacSubtotals[z] ?: 0L).toString()
+            }
+            ps.profileId to values
+        }
+
+        val totals = (1..49).map { n ->
+            subtotals.sumOf { ps ->
+                val group = ZodiacNumberTables.groupIndexForProfile(ps.profileId)
+                val z = ZodiacNumberTables.zodiacForNumber(n, group)
+                ps.zodiacSubtotals[z] ?: 0L
+            }.toString()
+        }
+
+        // 对话框：49 列横向滑动（不折叠）
+        table.addView(makeNumberRow("档案", (1..49).map { it.toString() }, bold = true))
+        profileRows.forEach { (pid, values) ->
+            table.addView(makeNumberRow("档$pid", values, bold = false))
+        }
+        table.addView(makeNumberRow("汇总", totals, bold = true))
+
+        AlertDialog.Builder(this)
+            .setTitle("号码价值表（1-49 × ${subtotals.size} 档案）")
+            .setView(content)
+            .setPositiveButton("关闭", null)
+            .setNegativeButton("导出图片") { _, _ ->
+                // 导出：整体折叠（1-25 上、26-49 下）
+                val folded = buildFoldedTable(profileRows, totals)
+                val bmp = drawTableToBitmap(folded)
+                val uri = saveBitmap(bmp)
+                toast(if (uri != null) "已导出图片 ✅" else "导出失败")
+            }
+            .show()
+    }
+
+    private fun buildFoldedTable(
+        profileRows: List<Pair<Int, List<String>>>,
+        totals: List<String>
+    ): LinearLayout {
+        val table = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+        }
+        // 上半：1..25
+        table.addView(makeNumberRow("档案", (1..25).map { it.toString() }, bold = true))
+        profileRows.forEach { (pid, values) ->
+            table.addView(makeNumberRow("档$pid", values.subList(0, 25), bold = false))
+        }
+        table.addView(makeNumberRow("汇总", totals.subList(0, 25), bold = true))
+        // 下半：26..49
+        table.addView(makeNumberRow("档案", (26..49).map { it.toString() }, bold = true))
+        profileRows.forEach { (pid, values) ->
+            table.addView(makeNumberRow("档$pid", values.subList(25, 49), bold = false))
+        }
+        table.addView(makeNumberRow("汇总", totals.subList(25, 49), bold = true))
+        return table
+    }
+
+    /** 把整张表（全 50 列 × 12 行）离屏绘制成位图 */
+    private fun drawTableToBitmap(table: LinearLayout): Bitmap {
+        val wSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        val hSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        table.measure(wSpec, hSpec)
+        val w = table.measuredWidth
+        val h = table.measuredHeight
+        table.layout(0, 0, w, h)
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        canvas.drawColor(Color.WHITE)
+        table.draw(canvas)
+        return bmp
+    }
+
+    private fun saveBitmap(bitmap: Bitmap): Uri? {
+        val name = "number_value_" +
+            SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date()) + ".png"
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val values = ContentValues().apply {
+                    put(MediaStore.Images.Media.DISPLAY_NAME, name)
+                    put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+                    put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/ZodiacTableApp")
+                }
+                val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                if (uri != null) {
+                    contentResolver.openOutputStream(uri)?.use { os ->
+                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, os)
+                    }
+                }
+                uri
+            } else {
+                val file = File(getExternalFilesDir(Environment.DIRECTORY_PICTURES), name)
+                FileOutputStream(file).use { fos ->
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos)
+                }
+                null
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    private fun makeNumberRow(label: String, values: List<String>, bold: Boolean): LinearLayout {
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        row.addView(makeNumberCell(label, 52, bold))
+        values.forEach { v -> row.addView(makeNumberCell(v, 42, bold)) }
+        return row
+    }
+
+    private fun makeNumberCell(text: String, widthDp: Int, bold: Boolean): TextView {
+        return TextView(this).apply {
+            this.text = text
+            textSize = 11f
+            gravity = Gravity.CENTER
+            if (bold) setTypeface(typeface, Typeface.BOLD)
+            setBackgroundResource(R.drawable.cell_border)
+            layoutParams = LinearLayout.LayoutParams(dp(widthDp), dp(36))
         }
     }
 

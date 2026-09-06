@@ -25,6 +25,7 @@ android {
             dimension "edition"
             applicationIdSuffix ".app1"
             resValue "string", "app_name", "生肖投注助手"
+            resValue "bool", "show_zodiac_numbers", "true"
         }
         app2 {
             dimension "edition"

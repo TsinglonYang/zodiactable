@@ -64,6 +64,13 @@
                 android:rowOrderPreserved="false"
                 android:useDefaultMargins="true" />
         </ScrollView>
+
+        <Button
+            android:id="@+id/btnNumberValueTable"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="查看号码价值表" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

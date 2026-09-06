@@ -2,15 +2,22 @@ package com.example.zodiactableapp.ui.home
 
 import android.app.AlertDialog
 import android.app.DatePickerDialog
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.text.InputType
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.*
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
+import androidx.navigation.NavOptions
+import androidx.navigation.fragment.findNavController
 import com.example.zodiactableapp.R
 import com.example.zodiactableapp.model.Zodiac
+import com.example.zodiactableapp.model.ZodiacNumberTables
 import com.example.zodiactableapp.shared.BetOrder
 import com.example.zodiactableapp.shared.BetSharedViewModel
 import java.util.Calendar
@@ -175,42 +182,45 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                     .show()
             }
 
+            // 点击单号（卡片）→ 选中该单并跳转到「金额」页
+            item.setOnClickListener {
+                sharedVM.selectOrder(order.id)
+                val options = NavOptions.Builder()
+                    .setLaunchSingleTop(true)
+                    .setPopUpTo(R.id.navigation_home, false, true)
+                    .build()
+                findNavController().navigate(R.id.navigation_dashboard, null, options)
+            }
+
             containerOrders.addView(item)
         }
     }
 
     private fun showOrderDialog(order: BetOrder, editable: Boolean) {
+        val showNumbers = resources.getBoolean(R.bool.show_zodiac_numbers)
+        val dateKey = sharedVM.getSelectedDate()
+
         val root = ScrollView(requireContext())
         val wrap = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(20, 20, 20, 20)
+            setPadding(dp(16), dp(12), dp(16), dp(12))
         }
         root.addView(wrap)
 
-        val dateKey = sharedVM.getSelectedDate()
-
         order.groupIds.forEachIndexed { index, gid ->
-            val members = sharedVM.getGroupMembers(gid).joinToString("、") { it.name }
-            val curLv = sharedVM.getGroupLevelForDate(gid, dateKey)
+            val onEdit: (() -> Unit)? = if (editable) {
+                { showEditOneGroupDialog(order, index, gid) }
+            } else null
 
-            val row = LinearLayout(requireContext()).apply {
-                orientation = LinearLayout.HORIZONTAL
-            }
-
-            val tv = TextView(requireContext()).apply {
-                text = "${index + 1}. $members   Lv$curLv"
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            }
-
-            row.addView(tv)
-
-            if (editable) {
-                val btn = Button(requireContext()).apply { text = "修改" }
-                btn.setOnClickListener { showEditOneGroupDialog(order, index, gid) }
-                row.addView(btn)
-            }
-
-            wrap.addView(row)
+            wrap.addView(
+                buildGroupCard(
+                    index = index,
+                    level = sharedVM.getGroupLevelForDate(gid, dateKey),
+                    zodiacs = sharedVM.getGroupMembers(gid).toList(),
+                    showNumbers = showNumbers,
+                    onEdit = onEdit
+                )
+            )
         }
 
         AlertDialog.Builder(requireContext())
@@ -218,6 +228,96 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             .setView(root)
             .setPositiveButton("关闭", null)
             .show()
+    }
+
+    private fun buildGroupCard(
+        index: Int,
+        level: Int,
+        zodiacs: List<Zodiac>,
+        showNumbers: Boolean,
+        onEdit: (() -> Unit)?
+    ): LinearLayout {
+        val card = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(10), dp(12), dp(12))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(10).toFloat()
+                setColor(Color.WHITE)
+                setStroke(dp(1), Color.rgb(230, 230, 230))
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(10) }
+        }
+
+        // 头部：第 N 组 + Lv 等级 +（编辑时）修改按钮
+        val header = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        header.addView(TextView(requireContext()).apply {
+            text = "第 ${index + 1} 组"
+            textSize = 15f
+            setTypeface(typeface, Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        })
+        header.addView(TextView(requireContext()).apply {
+            text = "Lv$level"
+            textSize = 12f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.rgb(0, 122, 255))
+        })
+        if (onEdit != null) {
+            val btn = Button(requireContext()).apply {
+                text = "修改"
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { marginStart = dp(8) }
+            }
+            btn.setOnClickListener { onEdit() }
+            header.addView(btn)
+        }
+        card.addView(header)
+
+        // 生肖行：4 列，每列 = 生肖名 +（app1 时）号码
+        val grid = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(8) }
+        }
+        zodiacs.forEach { zodiac ->
+            val cell = LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            cell.addView(TextView(requireContext()).apply {
+                text = zodiac.name
+                textSize = 13f
+                setTypeface(typeface, Typeface.BOLD)
+                gravity = Gravity.CENTER
+            })
+            if (showNumbers) {
+                cell.addView(TextView(requireContext()).apply {
+                    text = ZodiacNumberTables.numbersFor(
+                        zodiac,
+                        ZodiacNumberTables.groupIndexForProfile(sharedVM.getCurrentProfileId())
+                    ).joinToString(" ")
+                    textSize = 14f
+                    setTextColor(Color.rgb(130, 130, 130))
+                    gravity = Gravity.CENTER
+                })
+            }
+            grid.addView(cell)
+        }
+        card.addView(grid)
+
+        return card
     }
 
     private fun showEditOneGroupDialog(order: BetOrder, index: Int, oldGroupId: Int) {
@@ -360,4 +460,6 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     private fun toast(msg: String) {
         Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
     }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 }

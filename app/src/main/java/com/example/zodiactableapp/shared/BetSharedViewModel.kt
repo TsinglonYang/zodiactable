@@ -17,7 +17,9 @@ import com.example.zodiactableapp.shared.db.OrderItemEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -28,10 +30,16 @@ data class BetOrder(
     val createdDateKey: String
 )
 
+/** 某个档案在 12 个生肖上的「小计」 */
+data class ProfileSubtotal(
+    val profileId: Int,
+    val zodiacSubtotals: Map<Zodiac, Long>
+)
+
 class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
-        const val INITIAL_PROFILE_COUNT = 10
+        const val INITIAL_PROFILE_COUNT = 12
         private const val PROFILE_PREFS = "workspace_prefs"
         private const val KEY_CURRENT_PROFILE = "current_profile"
         private const val KEY_PROFILE_IDS = "profile_ids"
@@ -157,9 +165,13 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         _drawHistory.value = draws.toMap()
         clearLevelCache()
 
-        // ✅ 持久化保存
+        // ✅ 持久化保存：同步写入所有档案（含当前档案），保证 11 个 app 的当日生肖一致
         viewModelScope.launch(Dispatchers.IO) {
-            drawDao.upsert(DrawEntity(dateKey = dateKey, zodiac = zodiac))
+            profileIdsValue.forEach { pid ->
+                AppDatabase.get(appContext, databaseNameForProfile(pid))
+                    .drawDao()
+                    .upsert(DrawEntity(dateKey = dateKey, zodiac = zodiac))
+            }
         }
     }
 
@@ -850,9 +862,186 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ========= 汇总表小计：供“号码价值表”跨档案取用 =========
+
+    private val amountA = intArrayOf(
+        10, 15, 25, 35, 55, 80, 125, 190, 290, 440, 665, 1010, 1530, 2320, 3530
+    )
+    private val amountB = intArrayOf(
+        10, 20, 30, 45, 70, 110, 175, 270, 425, 670, 1045, 1640, 2570, 4050, 6500
+    )
+
+    private fun moneyByLevel(level: Int, members: Set<Zodiac>, yearZodiac: Zodiac): Int {
+        val lv = level.coerceIn(1, 15)
+        val arr = if (members.contains(yearZodiac)) amountB else amountA
+        return arr[lv - 1]
+    }
+
+    private fun loadYearZodiac(profileId: Int): Zodiac {
+        val name = appContext
+            .getSharedPreferences(PROFILE_META_PREFS, Context.MODE_PRIVATE)
+            .getString("$KEY_YEAR_ZODIAC_PREFIX$profileId", null)
+        return runCatching { if (name.isNullOrBlank()) Zodiac.values()[0] else Zodiac.valueOf(name) }
+            .getOrElse { Zodiac.values()[0] }
+    }
+
+    /** 纯函数：给定某档案的开奖/激活/覆盖，按日期推进出 495 个小组的等级 */
+    private fun computeLevelsForProfile(
+        dateKey: String,
+        draws: Map<String, Zodiac>,
+        activationDate: Array<String?>,
+        initialLevel: IntArray,
+        levelOverrides: Map<String, Map<Int, Int>>
+    ): IntArray {
+        val dateSet = HashSet<String>()
+        draws.keys.forEach { if (it <= dateKey) dateSet.add(it) }
+        activationDate.forEach { d -> if (d != null && d <= dateKey) dateSet.add(d) }
+        levelOverrides.keys.forEach { if (it <= dateKey) dateSet.add(it) }
+        val dates = dateSet.toList().sorted()
+        val levels = IntArray(GroupLevelEngine.GROUP_COUNT) { GroupLevelEngine.MIN_LEVEL }
+        val activeBet = BooleanArray(GroupLevelEngine.GROUP_COUNT) { false }
+        for (d in dates) {
+            for (gid in 0 until GroupLevelEngine.GROUP_COUNT) {
+                if (activationDate[gid] == d) {
+                    activeBet[gid] = true
+                    levels[gid] = initialLevel[gid].coerceIn(
+                        GroupLevelEngine.MIN_LEVEL, GroupLevelEngine.MAX_LEVEL
+                    )
+                }
+            }
+            val draw = draws[d]
+            if (draw != null) {
+                val next = engine.evolveOneDay(levels, activeBet, draw)
+                for (i in levels.indices) levels[i] = next[i]
+            }
+            val overridesToday = levelOverrides[d]
+            if (!overridesToday.isNullOrEmpty()) {
+                overridesToday.forEach { (gid, lv) ->
+                    if (gid in 0 until GroupLevelEngine.GROUP_COUNT) {
+                        levels[gid] = lv.coerceIn(GroupLevelEngine.MIN_LEVEL, GroupLevelEngine.MAX_LEVEL)
+                    }
+                }
+            }
+        }
+        return levels
+    }
+
+    /** 如果某档案还没初始化（无任何订单），先种入默认 3 单，保证号码价值表能直接取到数据 */
+    private suspend fun seedProfileIfEmpty(db: AppDatabase) {
+        val orderDao = db.orderDao()
+        val groupInitDao = db.groupInitDao()
+        if (orderDao.getAllWithItems().isNotEmpty()) return
+
+        val seed = defaultSeedItems()
+        db.withTransaction {
+            seed.forEachIndexed { idxOrder, orderItems ->
+                val orderNo = idxOrder + 1
+                val orderId = defaultSeedOrderId(orderNo)
+                val groupIds = ArrayList<Int>(orderItems.size)
+                val initMap = HashMap<Int, Int>(orderItems.size)
+                orderItems.forEach { item ->
+                    val gid = findGroupId(item.members)
+                    groupIds.add(gid)
+                    initMap[gid] = item.level.coerceIn(
+                        GroupLevelEngine.MIN_LEVEL, GroupLevelEngine.MAX_LEVEL
+                    )
+                }
+                orderDao.upsertOrder(
+                    OrderEntity(id = orderId, orderNo = orderNo, createdDateKey = DEFAULT_SEED_DATE)
+                )
+                val items = groupIds.mapIndexed { i, gid ->
+                    OrderItemEntity(
+                        orderId = orderId,
+                        pos = i + 1,
+                        groupId = gid,
+                        initLevel = initMap[gid] ?: GroupLevelEngine.MIN_LEVEL
+                    )
+                }
+                orderDao.upsertItems(items)
+                groupIds.forEach { gid ->
+                    if (groupInitDao.get(gid) == null) {
+                        groupInitDao.upsert(
+                            GroupInitEntity(
+                                groupId = gid,
+                                activationDateKey = DEFAULT_SEED_DATE,
+                                initLevel = initMap[gid] ?: GroupLevelEngine.MIN_LEVEL
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun computeProfileSubtotals(profileId: Int, dateKey: String): Map<Zodiac, Long> {
+        val db = AppDatabase.get(appContext, databaseNameForProfile(profileId))
+        seedProfileIfEmpty(db)
+
+        val draws = linkedMapOf<String, Zodiac>()
+        db.drawDao().getAll().forEach { draws[it.dateKey] = it.zodiac }
+
+        val activationDate = Array<String?>(GroupLevelEngine.GROUP_COUNT) { null }
+        val initialLevel = IntArray(GroupLevelEngine.GROUP_COUNT) { GroupLevelEngine.MIN_LEVEL }
+        db.groupInitDao().getAll().forEach { gi ->
+            if (gi.groupId in 0 until GroupLevelEngine.GROUP_COUNT) {
+                activationDate[gi.groupId] = gi.activationDateKey
+                initialLevel[gi.groupId] = gi.initLevel.coerceIn(
+                    GroupLevelEngine.MIN_LEVEL, GroupLevelEngine.MAX_LEVEL
+                )
+            }
+        }
+
+        val overrides = linkedMapOf<String, MutableMap<Int, Int>>()
+        db.levelOverrideDao().getAll().forEach { e ->
+            overrides.getOrPut(e.dateKey) { linkedMapOf() }[e.groupId] = e.level
+        }
+
+        val orders = db.orderDao().getAllWithItems().map { ow ->
+            val items = ow.items.sortedBy { it.pos }
+            BetOrder(ow.order.id, ow.order.orderNo, items.map { it.groupId }, ow.order.createdDateKey)
+        }
+
+        val yearZodiac = loadYearZodiac(profileId)
+        val levels = computeLevelsForProfile(dateKey, draws, activationDate, initialLevel, overrides)
+
+        val zodiacList = Zodiac.values().toList()
+        val subtotalCols = LongArray(zodiacList.size) { 0L }
+        for (order in orders) {
+            for (gid in order.groupIds.take(15)) {
+                val members = allGroups[gid]
+                val money = moneyByLevel(levels[gid], members, yearZodiac)
+                for (z in members) subtotalCols[zodiacList.indexOf(z)] += money.toLong()
+            }
+        }
+        val orderCount = orders.size
+        // 昨日/今日开奖出现的生肖，其对应数字价值统一置零
+        val zeroZodiacs = setOfNotNull(draws[todayKey()], draws[yesterdayKey()])
+        return zodiacList.mapIndexed { i, z ->
+            val v = subtotalCols[i] - orderCount.toLong() * 50L
+            z to if (z in zeroZodiacs) 0L else v
+        }.toMap()
+    }
+
+    /** 计算全部档案的小计（结果在主线程回调） */
+    fun computeAllProfileSubtotals(onDone: (List<ProfileSubtotal>) -> Unit) {
+        val dateKey = getSelectedDate()
+        viewModelScope.launch(Dispatchers.IO) {
+            val results = profileIdsValue.map { pid ->
+                ProfileSubtotal(pid, computeProfileSubtotals(pid, dateKey))
+            }
+            withContext(Dispatchers.Main) { onDone(results) }
+        }
+    }
+
     // ========= 工具 =========
     private fun todayKey(): String =
         SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+
+    private fun yesterdayKey(): String {
+        val cal = Calendar.getInstance()
+        cal.add(Calendar.DAY_OF_YEAR, -1)
+        return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(cal.time)
+    }
 
     private fun buildAllGroups(): List<Set<Zodiac>> {
         val result = mutableListOf<Set<Zodiac>>()
