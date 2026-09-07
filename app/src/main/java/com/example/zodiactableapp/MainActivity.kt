@@ -1,6 +1,7 @@
 package com.example.zodiactableapp
 
 import android.app.AlertDialog
+import android.app.DatePickerDialog
 import android.content.ContentValues
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -19,6 +20,7 @@ import android.widget.GridLayout
 import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.NumberPicker
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -38,6 +40,7 @@ import com.example.zodiactableapp.shared.ProfileSubtotal
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -64,9 +67,94 @@ class MainActivity : AppCompatActivity() {
         setupBackHandling()
         applyInsets()
 
-        binding.btnNumberValueTable.setOnClickListener {
-            sharedVM.computeAllProfileSubtotals { subtotals -> showNumberValueTable(subtotals) }
+        binding.btnNumberValueTable.setOnClickListener { showNumberValueDatePicker() }
+
+        binding.btnDrawNumber.setOnClickListener { showDrawNumberPicker() }
+
+        binding.btnDrawHistory.setOnClickListener { showDrawHistory() }
+    }
+
+    private fun showDrawNumberPicker() {
+        val cal = Calendar.getInstance()
+        DatePickerDialog(
+            this,
+            { _, y, m, d ->
+                val dateKey = "%04d-%02d-%02d".format(y, m + 1, d)
+                showDrawNumberPickerForDate(dateKey)
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
+    private fun showDrawNumberPickerForDate(dateKey: String) {
+        val picker = NumberPicker(this).apply {
+            minValue = 1
+            maxValue = 49
+            value = 1
         }
+        AlertDialog.Builder(this)
+            .setTitle("选择开奖数字（$dateKey，1-49）")
+            .setView(picker)
+            .setPositiveButton("确定") { _, _ ->
+                val number = picker.value
+                sharedVM.recordDrawNumber(dateKey, number)
+                val z = ZodiacNumberTables.zodiacForNumber(
+                    number, ZodiacNumberTables.groupIndexForProfile(sharedVM.getCurrentProfileId())
+                )
+                toast("已录入 $dateKey 开奖数字：$number（当前档案生肖：${z.name}）")
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun showDrawHistory() {
+        val history = sharedVM.getDrawNumberHistory()
+        val root = ScrollView(this)
+        val wrap = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(16), dp(20), dp(16))
+        }
+        root.addView(wrap)
+        if (history.isEmpty()) {
+            wrap.addView(TextView(this).apply {
+                text = "暂无历史录入"
+                textSize = 15f
+            })
+        } else {
+            history.forEach { (date, number) ->
+                val z = ZodiacNumberTables.zodiacForNumber(
+                    number, ZodiacNumberTables.groupIndexForProfile(1)
+                )
+                wrap.addView(TextView(this).apply {
+                    text = "$date　开奖数字：$number（生肖：${z.name}）"
+                    textSize = 15f
+                    setPadding(0, dp(6), 0, dp(6))
+                })
+            }
+        }
+        AlertDialog.Builder(this)
+            .setTitle("开奖历史录入")
+            .setView(root)
+            .setPositiveButton("关闭", null)
+            .show()
+    }
+
+    private fun showNumberValueDatePicker() {
+        val cal = Calendar.getInstance()
+        DatePickerDialog(
+            this,
+            { _, y, m, d ->
+                val dateKey = "%04d-%02d-%02d".format(y, m + 1, d)
+                sharedVM.computeAllProfileSubtotals(dateKey) { subtotals ->
+                    showNumberValueTable(dateKey, subtotals)
+                }
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        ).show()
     }
 
     private fun buildProfileLauncher(profileIds: List<Int>) {
@@ -264,7 +352,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showNumberValueTable(subtotals: List<ProfileSubtotal>) {
+    private fun showNumberValueTable(dateKey: String, subtotals: List<ProfileSubtotal>) {
         val content = ScrollView(this)
         val hsv = HorizontalScrollView(this).apply {
             overScrollMode = View.OVER_SCROLL_NEVER
@@ -276,12 +364,12 @@ class MainActivity : AppCompatActivity() {
         hsv.addView(table)
         content.addView(hsv)
 
-        // 先算好每个档案的 49 个值 + 汇总
+        // 先算好每个档案的 49 个值 + 汇总（保留 Long，末尾再追加“总金额”列）
         val profileRows = subtotals.sortedBy { it.profileId }.map { ps ->
             val group = ZodiacNumberTables.groupIndexForProfile(ps.profileId)
             val values = (1..49).map { n ->
                 val z = ZodiacNumberTables.zodiacForNumber(n, group)
-                (ps.zodiacSubtotals[z] ?: 0L).toString()
+                ps.zodiacSubtotals[z] ?: 0L
             }
             ps.profileId to values
         }
@@ -291,23 +379,26 @@ class MainActivity : AppCompatActivity() {
                 val group = ZodiacNumberTables.groupIndexForProfile(ps.profileId)
                 val z = ZodiacNumberTables.zodiacForNumber(n, group)
                 ps.zodiacSubtotals[z] ?: 0L
-            }.toString()
+            }
         }
+        val grandTotal = totals.sum()
 
-        // 对话框：49 列横向滑动（不折叠）
-        table.addView(makeNumberRow("档案", (1..49).map { it.toString() }, bold = true))
+        // 对话框：49 列横向滑动（不折叠），末尾加“总金额”
+        table.addView(makeNumberRow("档案", (1..49).map { it.toString() } + "总金额", bold = true))
         profileRows.forEach { (pid, values) ->
-            table.addView(makeNumberRow("档$pid", values, bold = false))
+            table.addView(
+                makeNumberRow("档$pid", values.map { it.toString() } + values.sum().toString(), bold = false)
+            )
         }
-        table.addView(makeNumberRow("汇总", totals, bold = true))
+        table.addView(makeNumberRow("汇总", totals.map { it.toString() } + grandTotal.toString(), bold = true))
 
         AlertDialog.Builder(this)
-            .setTitle("号码价值表（1-49 × ${subtotals.size} 档案）")
+            .setTitle("号码价值表（$dateKey · 1-49 × ${subtotals.size} 档案）")
             .setView(content)
             .setPositiveButton("关闭", null)
             .setNegativeButton("导出图片") { _, _ ->
                 // 导出：整体折叠（1-25 上、26-49 下）
-                val folded = buildFoldedTable(profileRows, totals)
+                val folded = buildFoldedTable(dateKey, profileRows, totals, grandTotal)
                 val bmp = drawTableToBitmap(folded)
                 val uri = saveBitmap(bmp)
                 toast(if (uri != null) "已导出图片 ✅" else "导出失败")
@@ -316,25 +407,39 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildFoldedTable(
-        profileRows: List<Pair<Int, List<String>>>,
-        totals: List<String>
+        dateKey: String,
+        profileRows: List<Pair<Int, List<Long>>>,
+        totals: List<Long>,
+        grandTotal: Long
     ): LinearLayout {
         val table = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(8), dp(8), dp(8), dp(8))
         }
+
+        // 顶部：日期 + 总金额
+        table.addView(TextView(this).apply {
+            text = "日期：$dateKey    总金额：$grandTotal"
+            textSize = 13f
+            setTypeface(typeface, Typeface.BOLD)
+            setPadding(dp(4), dp(8), dp(4), dp(8))
+            setTextColor(Color.BLACK)
+        })
+
         // 上半：1..25
         table.addView(makeNumberRow("档案", (1..25).map { it.toString() }, bold = true))
         profileRows.forEach { (pid, values) ->
-            table.addView(makeNumberRow("档$pid", values.subList(0, 25), bold = false))
+            table.addView(makeNumberRow("档$pid", values.subList(0, 25).map { it.toString() }, bold = false))
         }
-        table.addView(makeNumberRow("汇总", totals.subList(0, 25), bold = true))
-        // 下半：26..49
-        table.addView(makeNumberRow("档案", (26..49).map { it.toString() }, bold = true))
+        table.addView(makeNumberRow("汇总", totals.subList(0, 25).map { it.toString() }, bold = true))
+        // 下半：26..49（末尾加“总金额”）
+        table.addView(makeNumberRow("档案", (26..49).map { it.toString() } + "总金额", bold = true))
         profileRows.forEach { (pid, values) ->
-            table.addView(makeNumberRow("档$pid", values.subList(25, 49), bold = false))
+            table.addView(
+                makeNumberRow("档$pid", values.subList(25, 49).map { it.toString() } + values.sum().toString(), bold = false)
+            )
         }
-        table.addView(makeNumberRow("汇总", totals.subList(25, 49), bold = true))
+        table.addView(makeNumberRow("汇总", totals.subList(25, 49).map { it.toString() } + grandTotal.toString(), bold = true))
         return table
     }
 
