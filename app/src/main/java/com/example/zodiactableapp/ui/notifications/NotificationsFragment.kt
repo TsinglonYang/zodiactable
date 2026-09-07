@@ -20,6 +20,7 @@ import com.example.zodiactableapp.R
 import com.example.zodiactableapp.model.Zodiac
 import com.example.zodiactableapp.model.ZodiacNumberTables
 import com.example.zodiactableapp.shared.BetSharedViewModel
+import com.example.zodiactableapp.shared.GroupLevelEngine
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -232,7 +233,7 @@ class NotificationsFragment : Fragment(R.layout.fragment_notifications) {
 
             val colSums = LongArray(zodiacList.size) { 0L }
 
-            for (gid in order.groupIds.take(15)) {
+            for (gid in order.groupIds.take(GroupLevelEngine.ORDER_GROUP_COUNT)) {
                 val members = sharedVM.getGroupMembers(gid)
                 val level = sharedVM.getGroupLevelForDate(gid, dateKey)
                 val money = moneyByLevel(level, members, yearZodiac)
@@ -256,10 +257,10 @@ class NotificationsFragment : Fragment(R.layout.fragment_notifications) {
         val orderCount = orders.size
         val adjustedSubtotalCols = LongArray(zodiacList.size) { 0L }
         for (i in zodiacList.indices) {
-            adjustedSubtotalCols[i] = subtotalCols[i] - orderCount.toLong() * 50L
+            adjustedSubtotalCols[i] = subtotalCols[i] - orderCount.toLong() * 10L
         }
 
-        // 小计：在原始列汇总基础上减去 50 * 单数
+        // 小计：在原始列汇总基础上减去 10 * 单数
         rows.add(
             SummaryTableRow(
                 label = "小计",
@@ -287,7 +288,7 @@ class NotificationsFragment : Fragment(R.layout.fragment_notifications) {
         val subtotalAll = adjustedSubtotalCols.sum()
         val totalAll = totalCols.sum()
         tvFormulaHint.text =
-            "单数=$orderCount｜小计总额=￥$subtotalAll｜合计总额=￥$totalAll（普通*4，当年生肖列*5；均先减单数*50）"
+            "单数=$orderCount｜小计总额=￥$subtotalAll｜合计总额=￥$totalAll（普通*4，当年生肖列*5；均先减单数*10）"
     }
 
     private fun moneyByLevel(level: Int, members: Set<Zodiac>, yearZodiac: Zodiac): Int {

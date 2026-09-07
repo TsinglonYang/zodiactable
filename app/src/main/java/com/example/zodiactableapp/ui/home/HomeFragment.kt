@@ -20,6 +20,7 @@ import com.example.zodiactableapp.model.Zodiac
 import com.example.zodiactableapp.model.ZodiacNumberTables
 import com.example.zodiactableapp.shared.BetOrder
 import com.example.zodiactableapp.shared.BetSharedViewModel
+import com.example.zodiactableapp.shared.GroupLevelEngine
 import java.util.Calendar
 
 class HomeFragment : Fragment(R.layout.fragment_home) {
@@ -50,8 +51,8 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         btnPickDate.setOnClickListener { showDatePicker() }
 
         btnSelectGroup.setOnClickListener {
-            if (buildingGroupIds.size >= 15) {
-                toast("当前新单已满 15 组，将自动生成")
+            if (buildingGroupIds.size >= GroupLevelEngine.ORDER_GROUP_COUNT) {
+                toast("当前新单已满 ${GroupLevelEngine.ORDER_GROUP_COUNT} 组，将自动生成")
                 commitNewOrderIfReady()
                 return@setOnClickListener
             }
@@ -72,9 +73,9 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                 pickInitialLevel(defaultLv = 1) { lv ->
                     buildingGroupIds.add(gid)
                     buildingInitLevels[gid] = lv
-                    toast("已加入：${members.joinToString("、") { it.name }}  Lv$lv  （${buildingGroupIds.size}/15）")
+                    toast("已加入：${members.joinToString("、") { it.name }}  Lv$lv  （${buildingGroupIds.size}/${GroupLevelEngine.ORDER_GROUP_COUNT}）")
 
-                    if (buildingGroupIds.size == 15) {
+                    if (buildingGroupIds.size == GroupLevelEngine.ORDER_GROUP_COUNT) {
                         commitNewOrderIfReady()
                     } else {
                         refreshTitle()
@@ -113,8 +114,8 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     }
 
     private fun commitNewOrderIfReady() {
-        if (buildingGroupIds.size != 15) {
-            toast("当前新单不足 15 组：${buildingGroupIds.size}/15")
+        if (buildingGroupIds.size != GroupLevelEngine.ORDER_GROUP_COUNT) {
+            toast("当前新单不足 ${GroupLevelEngine.ORDER_GROUP_COUNT} 组：${buildingGroupIds.size}/${GroupLevelEngine.ORDER_GROUP_COUNT}")
             return
         }
 
@@ -138,7 +139,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     private fun refreshTitle() {
         val orderCount = sharedVM.orders.value?.size ?: 0
         val building = buildingGroupIds.size
-        tvSelectedGroups.text = "大组列表（$orderCount 单） | 正在创建：$building/15"
+        tvSelectedGroups.text = "大组列表（$orderCount 单） | 正在创建：$building/${GroupLevelEngine.ORDER_GROUP_COUNT}"
     }
 
     private fun renderOrders(orders: List<BetOrder>) {
@@ -159,7 +160,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
 
             val checked = (order.id == selectedId)
             tvTitle.text = (if (checked) "✅ " else "") + "第 ${order.orderNo} 号单"
-            tvSub.text = "创建日期：${order.createdDateKey}   组数：${order.groupIds.size}/15\n当前等级($dateKey)：${order.groupIds.take(6).joinToString { "Lv${sharedVM.getGroupLevelForDate(it, dateKey)}" }}"
+            tvSub.text = "创建日期：${order.createdDateKey}   组数：${order.groupIds.size}/${GroupLevelEngine.ORDER_GROUP_COUNT}\n当前等级($dateKey)：${order.groupIds.take(6).joinToString { "Lv${sharedVM.getGroupLevelForDate(it, dateKey)}" }}"
 
             btnView.setOnClickListener {
                 sharedVM.selectOrder(order.id)

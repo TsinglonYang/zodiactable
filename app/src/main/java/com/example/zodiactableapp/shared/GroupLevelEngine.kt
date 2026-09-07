@@ -18,6 +18,9 @@ class GroupLevelEngine(
         const val GROUP_COUNT = 495
         const val MIN_LEVEL = 1
         const val MAX_LEVEL = 15
+
+        /** 每个大单固定包含的小组数（每小组 4 个生肖） */
+        const val ORDER_GROUP_COUNT = 3
     }
 
     /** 内部状态（如果你用内部推进就用它）；按日期回算也会用 evolveOneDay() */

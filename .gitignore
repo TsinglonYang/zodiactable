@@ -27,3 +27,6 @@ local.properties
 
 # Office 临时锁文件
 ~$*
+
+# 签名配置（含密钥，不入库）
+keystore.properties
