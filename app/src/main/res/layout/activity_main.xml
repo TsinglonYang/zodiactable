@@ -66,10 +66,24 @@
         </ScrollView>
 
         <Button
-            android:id="@+id/btnNumberValueTable"
+            android:id="@+id/btnDrawNumber"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
+            android:text="录入开奖数字" />
+
+        <Button
+            android:id="@+id/btnDrawHistory"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="查看开奖历史" />
+
+        <Button
+            android:id="@+id/btnNumberValueTable"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
             android:text="查看号码价值表" />
     </LinearLayout>
 

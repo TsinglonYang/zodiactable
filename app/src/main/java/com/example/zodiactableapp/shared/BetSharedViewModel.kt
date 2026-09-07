@@ -8,6 +8,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
 import com.example.zodiactableapp.model.Zodiac
+import com.example.zodiactableapp.model.ZodiacNumberTables
 import com.example.zodiactableapp.shared.db.AppDatabase
 import com.example.zodiactableapp.shared.db.DrawEntity
 import com.example.zodiactableapp.shared.db.GroupInitEntity
@@ -53,6 +54,7 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         private const val DEFAULT_SEED_DATE = "2026-02-20"
         private const val KEY_DEFAULT_SEED_VERSION_PREFIX = "default_seed_version_"
         private const val SEED_ORDER_ID_BASE = 1700000000000L
+        private const val DRAW_NUMBER_PREFIX = "draw_number_"
     }
 
     private val appContext = app.applicationContext
@@ -165,9 +167,31 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         _drawHistory.value = draws.toMap()
         clearLevelCache()
 
-        // ✅ 持久化保存：同步写入所有档案（含当前档案），保证 11 个 app 的当日生肖一致
+        // ✅ 持久化保存：只写入当前档案（每个 app 各自录入）
+        viewModelScope.launch(Dispatchers.IO) {
+            drawDao.upsert(DrawEntity(dateKey = dateKey, zodiac = zodiac))
+        }
+    }
+
+    fun getDraw(dateKey: String): Zodiac? = draws[dateKey]
+
+    /** 按「当日开奖数字(1..49)」同步录入：每个档案各自用其组映射出当日生肖，再写入各自的数据库 */
+    fun recordDrawNumber(dateKey: String, number: Int) {
+        require(number in 1..49) { "开奖数字必须在 1..49" }
+        val currentZodiac = ZodiacNumberTables.zodiacForNumber(
+            number, ZodiacNumberTables.groupIndexForProfile(getCurrentProfileId())
+        )
+        // 当前档案内存状态先更新
+        draws[dateKey] = currentZodiac
+        _drawHistory.value = draws.toMap()
+        clearLevelCache()
+        // 保存数字历史（用于查看历史录入）
+        profilePrefs.edit().putInt(drawNumberKey(dateKey), number).apply()
+        // 写入所有档案
         viewModelScope.launch(Dispatchers.IO) {
             profileIdsValue.forEach { pid ->
+                val group = ZodiacNumberTables.groupIndexForProfile(pid)
+                val zodiac = ZodiacNumberTables.zodiacForNumber(number, group)
                 AppDatabase.get(appContext, databaseNameForProfile(pid))
                     .drawDao()
                     .upsert(DrawEntity(dateKey = dateKey, zodiac = zodiac))
@@ -175,7 +199,18 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun getDraw(dateKey: String): Zodiac? = draws[dateKey]
+    /** 历史录入的数字（dateKey -> number），按日期升序 */
+    fun getDrawNumberHistory(): List<Pair<String, Int>> {
+        val result = mutableListOf<Pair<String, Int>>()
+        profilePrefs.all.forEach { (key, value) ->
+            if (key.startsWith(DRAW_NUMBER_PREFIX) && value is Int) {
+                result.add(key.removePrefix(DRAW_NUMBER_PREFIX) to value)
+            }
+        }
+        return result.sortedBy { it.first }
+    }
+
+    private fun drawNumberKey(dateKey: String): String = "$DRAW_NUMBER_PREFIX$dateKey"
 
     // ========= 组合激活/初始等级（新增大组要重新定级） =========
     private val activationDate: Array<String?> = Array(GroupLevelEngine.GROUP_COUNT) { null }
@@ -1014,17 +1049,13 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         val orderCount = orders.size
-        // 昨日/今日开奖出现的生肖，其对应数字价值统一置零
-        val zeroZodiacs = setOfNotNull(draws[todayKey()], draws[yesterdayKey()])
         return zodiacList.mapIndexed { i, z ->
-            val v = subtotalCols[i] - orderCount.toLong() * 50L
-            z to if (z in zeroZodiacs) 0L else v
+            z to (subtotalCols[i] - orderCount.toLong() * 50L)
         }.toMap()
     }
 
     /** 计算全部档案的小计（结果在主线程回调） */
-    fun computeAllProfileSubtotals(onDone: (List<ProfileSubtotal>) -> Unit) {
-        val dateKey = getSelectedDate()
+    fun computeAllProfileSubtotals(dateKey: String, onDone: (List<ProfileSubtotal>) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             val results = profileIdsValue.map { pid ->
                 ProfileSubtotal(pid, computeProfileSubtotals(pid, dateKey))
@@ -1036,12 +1067,6 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
     // ========= 工具 =========
     private fun todayKey(): String =
         SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-
-    private fun yesterdayKey(): String {
-        val cal = Calendar.getInstance()
-        cal.add(Calendar.DAY_OF_YEAR, -1)
-        return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(cal.time)
-    }
 
     private fun buildAllGroups(): List<Set<Zodiac>> {
         val result = mutableListOf<Set<Zodiac>>()

@@ -25,5 +25,11 @@ local.properties
 *.keystore
 .kotlin/
 
+# 签名密钥配置（含密码，不入库）
+keystore.properties
+
+# apksigner v4 签名副产物
+*.idsig
+
 # Office 临时锁文件
 ~$*
