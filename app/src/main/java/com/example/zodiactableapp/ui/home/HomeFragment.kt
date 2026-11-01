@@ -15,11 +15,14 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
+import com.example.zodiactableapp.BuildConfig
 import com.example.zodiactableapp.R
 import com.example.zodiactableapp.model.Zodiac
 import com.example.zodiactableapp.model.ZodiacNumberTables
 import com.example.zodiactableapp.shared.BetOrder
 import com.example.zodiactableapp.shared.BetSharedViewModel
+import com.example.zodiactableapp.ui.localizedDatePickerContext
+import com.example.zodiactableapp.ui.showLocalized
 import java.util.Calendar
 
 class HomeFragment : Fragment(R.layout.fragment_home) {
@@ -38,6 +41,9 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     private val buildingGroupIds = mutableListOf<Int>()
     private val buildingInitLevels = mutableMapOf<Int, Int>() // 1..15
 
+    /** d1/d2/d3 构建：只保留一张单，禁止新增、删除、改单号/改内容 */
+    private val singleOrderMode = BuildConfig.SEED_ORDER_NO in 1..3
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         tvCurrentProfile = view.findViewById(R.id.tvCurrentProfile)
         tvDate = view.findViewById(R.id.tvDate)
@@ -48,6 +54,10 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         containerOrders = view.findViewById(R.id.containerOrders)
 
         btnPickDate.setOnClickListener { showDatePicker() }
+
+        if (singleOrderMode) {
+            btnSelectGroup.visibility = View.GONE
+        }
 
         btnSelectGroup.setOnClickListener {
             if (buildingGroupIds.size >= 15) {
@@ -112,6 +122,15 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         refreshTitle()
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (singleOrderMode) {
+            sharedVM.invalidateLevels()
+            renderOrders(sharedVM.orders.value.orEmpty())
+            refreshTitle()
+        }
+    }
+
     private fun commitNewOrderIfReady() {
         if (buildingGroupIds.size != 15) {
             toast("当前新单不足 15 组：${buildingGroupIds.size}/15")
@@ -136,13 +155,26 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     }
 
     private fun refreshTitle() {
-        val orderCount = sharedVM.orders.value?.size ?: 0
+        val orders = sharedVM.orders.value.orEmpty()
+        if (singleOrderMode) {
+            val order = orders.minByOrNull { it.orderNo }
+            tvSelectedGroups.text = if (order != null) {
+                "第 ${order.orderNo} 号单 · ${order.groupIds.size} 组"
+            } else {
+                "第 ? 号单"
+            }
+            return
+        }
         val building = buildingGroupIds.size
-        tvSelectedGroups.text = "大组列表（$orderCount 单） | 正在创建：$building/15"
+        tvSelectedGroups.text = "大组列表（${orders.size} 单） | 正在创建：$building/15"
     }
 
     private fun renderOrders(orders: List<BetOrder>) {
         containerOrders.removeAllViews()
+        if (singleOrderMode) {
+            renderSingleOrderExpanded(orders)
+            return
+        }
         val selectedId = sharedVM.selectedOrder.value?.id
         val dateKey = sharedVM.getSelectedDate()
 
@@ -196,6 +228,81 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         }
     }
 
+    /** 单张单模式：直接展开这一单的 15 个小组，并显示号码与当日金额 */
+    private fun renderSingleOrderExpanded(orders: List<BetOrder>) {
+        val order = orders.minByOrNull { it.orderNo } ?: return
+        val dateKey = sharedVM.getSelectedDate()
+
+        containerOrders.addView(
+            buildSingleOrderHeader(
+                order = order,
+                dateKey = dateKey,
+                totalAmount = sharedVM.totalAmountForDate(order, dateKey)
+            )
+        )
+
+        order.groupIds.take(15).forEachIndexed { index, gid ->
+            val members = sharedVM.getGroupMembers(gid)
+            containerOrders.addView(
+                buildGroupCard(
+                    index = index,
+                    level = sharedVM.getGroupLevelForDate(gid, dateKey),
+                    zodiacs = members.toList(),
+                    showNumbers = true,
+                    onEdit = null,
+                    amountPerZodiac = sharedVM.amountPerZodiacForDate(gid, dateKey)
+                )
+            )
+        }
+    }
+
+    private fun buildSingleOrderHeader(
+        order: BetOrder,
+        dateKey: String,
+        totalAmount: Int
+    ): LinearLayout {
+        val drawText = sharedVM.getDraw(dateKey)?.name ?: "未录入"
+        return LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(10), dp(12), dp(12))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(10).toFloat()
+                setColor(Color.rgb(240, 247, 255))
+                setStroke(dp(1), Color.rgb(210, 225, 245))
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(10) }
+
+            addView(TextView(context).apply {
+                text = "第 ${order.orderNo} 号单"
+                textSize = 18f
+                setTypeface(typeface, Typeface.BOLD)
+            })
+            addView(TextView(context).apply {
+                text = "创建日期：${order.createdDateKey}   组数：${order.groupIds.size}/15"
+                textSize = 13f
+                setTextColor(Color.rgb(110, 110, 110))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = dp(4) }
+            })
+            addView(TextView(context).apply {
+                text = "当日开奖：$drawText    当日总金额：￥$totalAmount"
+                textSize = 16f
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(Color.rgb(0, 122, 255))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = dp(6) }
+            })
+        }
+    }
+
     private fun showOrderDialog(order: BetOrder, editable: Boolean) {
         val showNumbers = resources.getBoolean(R.bool.show_zodiac_numbers)
         val dateKey = sharedVM.getSelectedDate()
@@ -235,7 +342,8 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         level: Int,
         zodiacs: List<Zodiac>,
         showNumbers: Boolean,
-        onEdit: (() -> Unit)?
+        onEdit: (() -> Unit)?,
+        amountPerZodiac: Int? = null
     ): LinearLayout {
         val card = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
@@ -282,7 +390,19 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         }
         card.addView(header)
 
-        // 生肖行：4 列，每列 = 生肖名 +（app1 时）号码
+        if (amountPerZodiac != null) {
+            card.addView(TextView(requireContext()).apply {
+                text = "每个生肖 ￥$amountPerZodiac    本组小计 ￥${amountPerZodiac * zodiacs.size}"
+                textSize = 12f
+                setTextColor(Color.rgb(0, 122, 255))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = dp(6) }
+            })
+        }
+
+        // 生肖行：4 列，每列 = 生肖名 + 号码
         val grid = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
@@ -446,7 +566,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         if (parts.size == 3) {
             cal.set(parts[0].toInt(), parts[1].toInt() - 1, parts[2].toInt())
         }
-        DatePickerDialog(requireContext(),
+        DatePickerDialog(localizedDatePickerContext(requireContext()),
             { _, y, m, d ->
                 val key = "%04d-%02d-%02d".format(y, m + 1, d)
                 sharedVM.setSelectedDate(key)
@@ -454,7 +574,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             cal.get(Calendar.YEAR),
             cal.get(Calendar.MONTH),
             cal.get(Calendar.DAY_OF_MONTH)
-        ).show()
+        ).showLocalized()
     }
 
     private fun toast(msg: String) {

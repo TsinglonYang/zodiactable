@@ -20,6 +20,8 @@ import com.example.zodiactableapp.R
 import com.example.zodiactableapp.model.Zodiac
 import com.example.zodiactableapp.model.ZodiacNumberTables
 import com.example.zodiactableapp.shared.BetSharedViewModel
+import com.example.zodiactableapp.ui.localizedDatePickerContext
+import com.example.zodiactableapp.ui.showLocalized
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -485,7 +487,7 @@ class NotificationsFragment : Fragment(R.layout.fragment_notifications) {
         }
 
         DatePickerDialog(
-            requireContext(),
+            localizedDatePickerContext(requireContext()),
             { _, y, m, d ->
                 val key = "%04d-%02d-%02d".format(y, m + 1, d)
                 sharedVM.setSelectedDate(key)
@@ -493,7 +495,7 @@ class NotificationsFragment : Fragment(R.layout.fragment_notifications) {
             cal.get(Calendar.YEAR),
             cal.get(Calendar.MONTH),
             cal.get(Calendar.DAY_OF_MONTH)
-        ).show()
+        ).showLocalized()
     }
 
     // ====================== ✅ 导出整表图片（横向全列 + 纵向全行） ======================

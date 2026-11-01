@@ -7,6 +7,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
+import com.example.zodiactableapp.BuildConfig
 import com.example.zodiactableapp.model.Zodiac
 import com.example.zodiactableapp.model.ZodiacNumberTables
 import com.example.zodiactableapp.shared.db.AppDatabase
@@ -48,13 +49,22 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         private const val PROFILE_META_PREFS = "zodiac_table_prefs"
         private const val KEY_YEAR_ZODIAC_PREFIX = "year_zodiac_profile_"
         private const val LEGACY_DB_NAME = "zodiac_table.db"
-        private const val DEFAULT_SEED_ORDER_COUNT = 3
+        private const val ALL_SEED_ORDER_COUNT = 3
         private const val LEGACY_SEED_ORDER_COUNT = 15
         private const val DEFAULT_SEED_VERSION = 2
-        private const val DEFAULT_SEED_DATE = "2026-02-20"
+        private const val DEFAULT_SEED_DATE = "2026-01-01"
         private const val KEY_DEFAULT_SEED_VERSION_PREFIX = "default_seed_version_"
         private const val SEED_ORDER_ID_BASE = 1700000000000L
         private const val DRAW_NUMBER_PREFIX = "draw_number_"
+
+        /** 单张单模式：d1/d2/d3 构建；旧的 app1..app10 为 0，保持 3 张单 */
+        private val SINGLE_ORDER_MODE: Boolean =
+            BuildConfig.SEED_ORDER_NO in 1..ALL_SEED_ORDER_COUNT
+
+        /** 当前构建需要播种的单号：单张单模式只含对应的一张 */
+        private fun seedOrderNumbers(): List<Int> =
+            if (SINGLE_ORDER_MODE) listOf(BuildConfig.SEED_ORDER_NO)
+            else (1..ALL_SEED_ORDER_COUNT).toList()
     }
 
     private val appContext = app.applicationContext
@@ -244,6 +254,11 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         levelCache.clear()
     }
 
+    /** 首页恢复时强制按最新开奖/日期重算等级，避免缓存残留 */
+    fun invalidateLevels() {
+        clearLevelCache()
+    }
+
     /** Dashboard 用：取“当前查看日期”的等级 */
     fun getGroupLevel(groupId: Int): Int {
         return getGroupLevelForDate(groupId, getSelectedDate())
@@ -312,6 +327,7 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         groupIds: List<Int>,
         initLevels: Map<Int, Int>
     ) {
+        require(!SINGLE_ORDER_MODE) { "当前应用只允许一张单" }
         val cleaned = groupIds.distinct().take(15)
         require(cleaned.size == 15) { "一单必须正好 15 个小组" }
         require(cleaned.all { it in 0 until GroupLevelEngine.GROUP_COUNT }) { "存在非法 groupId" }
@@ -380,6 +396,7 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun deleteOrder(orderId: Long) {
+        if (SINGLE_ORDER_MODE) return
         val target = ordersInternal.firstOrNull { it.id == orderId } ?: return
         ordersInternal.remove(target)
 
@@ -425,6 +442,7 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun updateOrderNo(orderId: Long, newOrderNo: Int) {
+        if (SINGLE_ORDER_MODE) return
         val target = ordersInternal.firstOrNull { it.id == orderId } ?: return
         target.orderNo = newOrderNo.coerceAtLeast(1)
         publishOrders()
@@ -585,6 +603,9 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         _orders.postValue(ordersInternal.sortedBy { it.orderNo })
+        if (SINGLE_ORDER_MODE) {
+            _selectedOrder.postValue(ordersInternal.minByOrNull { it.orderNo })
+        }
         clearLevelCache()
     }
 
@@ -604,9 +625,11 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun matchesCurrentDefaultSeed(order: BetOrder): Boolean {
         val orderNo = (order.id - SEED_ORDER_ID_BASE).toInt()
-        if (orderNo !in 1..DEFAULT_SEED_ORDER_COUNT) return false
+        if (orderNo !in seedOrderNumbers()) return false
 
-        val expectedGroupIds = defaultSeedItems()[orderNo - 1].map { findGroupId(it.members) }
+        val expectedGroupIds = defaultSeedItems().getOrNull(orderNo - 1)
+            ?.map { findGroupId(it.members) }
+            ?: return false
         return order.groupIds == expectedGroupIds
     }
 
@@ -655,7 +678,7 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
                 groupInitDao.delete(gid)
                 levelOverrideDao.deleteByGroupId(gid)
             }
-            insertDefaultSeedOrders(seed, existingSeedIds = emptySet())
+            insertDefaultSeedOrders(seed, seedOrderNumbers(), existingSeedIds = emptySet())
         }
 
         markDefaultSeedCurrent(profileId)
@@ -759,7 +782,7 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
                 .filter { it in seedOrderIds }
                 .toSet()
             val isPartialDefaultSeed = existingSeedIds.isNotEmpty() &&
-                existingSeedIds.size < DEFAULT_SEED_ORDER_COUNT &&
+                existingSeedIds.size < seedOrderIds.size &&
                 ordersInternal.all { it.id in seedOrderIds }
 
             if (ordersInternal.isEmpty() || isPartialDefaultSeed) {
@@ -777,7 +800,7 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
     private fun defaultSeedOrderId(orderNo: Int): Long = SEED_ORDER_ID_BASE + orderNo
 
     private fun defaultSeedOrderIds(): Set<Long> =
-        (1..DEFAULT_SEED_ORDER_COUNT).map { defaultSeedOrderId(it) }.toSet()
+        seedOrderNumbers().map { defaultSeedOrderId(it) }.toSet()
 
     private fun defaultSeedItems(): List<List<SeedItem>> = listOf(
         listOf(
@@ -834,7 +857,7 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
     )
 
     private fun validateDefaultSeed(seed: List<List<SeedItem>>) {
-        require(seed.size == DEFAULT_SEED_ORDER_COUNT)
+        require(seed.size == ALL_SEED_ORDER_COUNT)
         require(seed.all { it.size == 15 })
     }
 
@@ -843,18 +866,19 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         validateDefaultSeed(seed)
 
         db.withTransaction {
-            insertDefaultSeedOrders(seed, existingSeedIds)
+            insertDefaultSeedOrders(seed, seedOrderNumbers(), existingSeedIds)
         }
     }
 
     private suspend fun insertDefaultSeedOrders(
         seed: List<List<SeedItem>>,
+        orderNos: List<Int>,
         existingSeedIds: Set<Long>
     ) {
-        seed.forEachIndexed { idxOrder, orderItems ->
-            val orderNo = idxOrder + 1
+        orderNos.forEach { orderNo ->
+            val orderItems = seed[orderNo - 1]
             val orderId = defaultSeedOrderId(orderNo)
-            if (orderId in existingSeedIds) return@forEachIndexed
+            if (orderId in existingSeedIds) return@forEach
 
             val groupIds = ArrayList<Int>(orderItems.size)
             val initMap = HashMap<Int, Int>(orderItems.size)
@@ -920,6 +944,33 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
             .getOrElse { Zodiac.values()[0] }
     }
 
+    private fun loadYearZodiacOrNull(profileId: Int): Zodiac? {
+        val name = appContext
+            .getSharedPreferences(PROFILE_META_PREFS, Context.MODE_PRIVATE)
+            .getString("$KEY_YEAR_ZODIAC_PREFIX$profileId", null)
+        return runCatching { if (name.isNullOrBlank()) null else Zodiac.valueOf(name) }.getOrNull()
+    }
+
+    /**
+     * 首页展开用：某小组当日“每个生肖”的金额。
+     * 与金额页同一口径：当年生肖所在小组用 B 档，否则 A 档；未设置当年生肖时按 A 档。
+     */
+    fun amountPerZodiacForDate(groupId: Int, dateKey: String): Int {
+        val lv = getGroupLevelForDate(groupId, dateKey).coerceIn(
+            GroupLevelEngine.MIN_LEVEL, GroupLevelEngine.MAX_LEVEL
+        )
+        val members = getGroupMembers(groupId)
+        val yearZodiac = loadYearZodiacOrNull(getCurrentProfileId())
+        val arr = if (yearZodiac != null && members.contains(yearZodiac)) amountB else amountA
+        return arr[lv - 1]
+    }
+
+    /** 首页展开用：整单当日总金额（15 组各 4 个生肖金额之和，与金额页“总金额”一致） */
+    fun totalAmountForDate(order: BetOrder, dateKey: String): Int =
+        order.groupIds.take(15).sumOf { gid ->
+            amountPerZodiacForDate(gid, dateKey) * getGroupMembers(gid).size
+        }
+
     /** 纯函数：给定某档案的开奖/激活/覆盖，按日期推进出 495 个小组的等级 */
     private fun computeLevelsForProfile(
         dateKey: String,
@@ -961,7 +1012,7 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         return levels
     }
 
-    /** 如果某档案还没初始化（无任何订单），先种入默认 3 单，保证号码价值表能直接取到数据 */
+    /** 如果某档案还没初始化（无任何订单），先种入当前构建对应的默认单，保证号码价值表能直接取到数据 */
     private suspend fun seedProfileIfEmpty(db: AppDatabase) {
         val orderDao = db.orderDao()
         val groupInitDao = db.groupInitDao()
@@ -969,8 +1020,8 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
 
         val seed = defaultSeedItems()
         db.withTransaction {
-            seed.forEachIndexed { idxOrder, orderItems ->
-                val orderNo = idxOrder + 1
+            seedOrderNumbers().forEach { orderNo ->
+                val orderItems = seed[orderNo - 1]
                 val orderId = defaultSeedOrderId(orderNo)
                 val groupIds = ArrayList<Int>(orderItems.size)
                 val initMap = HashMap<Int, Int>(orderItems.size)

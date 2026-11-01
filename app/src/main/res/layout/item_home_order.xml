@@ -23,7 +23,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:text="创建日期：2026-02-20   组数：15/15"
+        android:text="创建日期：2026-01-01   组数：15/15"
         android:textSize="13sp" />
 
     <!-- ✅ 可选：显示初始等级摘要（避免你代码里引用 tvLevel 报错） -->

@@ -37,6 +37,8 @@ import com.example.zodiactableapp.databinding.ActivityMainBinding
 import com.example.zodiactableapp.model.ZodiacNumberTables
 import com.example.zodiactableapp.shared.BetSharedViewModel
 import com.example.zodiactableapp.shared.ProfileSubtotal
+import com.example.zodiactableapp.ui.localizedDatePickerContext
+import com.example.zodiactableapp.ui.showLocalized
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -50,6 +52,8 @@ class MainActivity : AppCompatActivity() {
     private val sharedVM: BetSharedViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 日期选择器等系统控件按简体中文显示（需在创建 DatePicker 之前设置）
+        Locale.setDefault(Locale.SIMPLIFIED_CHINESE)
         super.onCreate(savedInstanceState)
 
         // 关键：我们自己处理系统栏(insets)，避免不同手机顶部/底部遮挡
@@ -77,7 +81,7 @@ class MainActivity : AppCompatActivity() {
     private fun showDrawNumberPicker() {
         val cal = Calendar.getInstance()
         DatePickerDialog(
-            this,
+            localizedDatePickerContext(this),
             { _, y, m, d ->
                 val dateKey = "%04d-%02d-%02d".format(y, m + 1, d)
                 showDrawNumberPickerForDate(dateKey)
@@ -85,7 +89,7 @@ class MainActivity : AppCompatActivity() {
             cal.get(Calendar.YEAR),
             cal.get(Calendar.MONTH),
             cal.get(Calendar.DAY_OF_MONTH)
-        ).show()
+        ).showLocalized()
     }
 
     private fun showDrawNumberPickerForDate(dateKey: String) {
@@ -339,7 +343,7 @@ class MainActivity : AppCompatActivity() {
     private fun showNumberValueDatePicker() {
         val cal = Calendar.getInstance()
         DatePickerDialog(
-            this,
+            localizedDatePickerContext(this),
             { _, y, m, d ->
                 val dateKey = "%04d-%02d-%02d".format(y, m + 1, d)
                 sharedVM.computeAllProfileSubtotals(dateKey) { subtotals ->
@@ -349,7 +353,18 @@ class MainActivity : AppCompatActivity() {
             cal.get(Calendar.YEAR),
             cal.get(Calendar.MONTH),
             cal.get(Calendar.DAY_OF_MONTH)
-        ).show()
+        ).showLocalized()
+    }
+
+    /**
+     * 号码价值表每档 49 个值的调整：
+     * 取本档第三小的值，49 个值统一减去它，小于 0 的置 0。
+     * 效果等价于“倒数第一小、倒数第二小、倒数第三小都变成 0”。
+     */
+    private fun adjustNumberValueRow(values: List<Long>): List<Long> {
+        if (values.size < 3) return values
+        val thirdSmallest = values.sorted()[2]
+        return values.map { (it - thirdSmallest).coerceAtLeast(0L) }
     }
 
     private fun showNumberValueTable(dateKey: String, subtotals: List<ProfileSubtotal>) {
@@ -364,22 +379,18 @@ class MainActivity : AppCompatActivity() {
         hsv.addView(table)
         content.addView(hsv)
 
-        // 先算好每个档案的 49 个值 + 汇总（保留 Long，末尾再追加“总金额”列）
+        // 先算好每个档案的 49 个值，按“减去本档第三小值、前两小置零”调整后再汇总
         val profileRows = subtotals.sortedBy { it.profileId }.map { ps ->
             val group = ZodiacNumberTables.groupIndexForProfile(ps.profileId)
             val values = (1..49).map { n ->
                 val z = ZodiacNumberTables.zodiacForNumber(n, group)
                 ps.zodiacSubtotals[z] ?: 0L
             }
-            ps.profileId to values
+            ps.profileId to adjustNumberValueRow(values)
         }
 
-        val totals = (1..49).map { n ->
-            subtotals.sumOf { ps ->
-                val group = ZodiacNumberTables.groupIndexForProfile(ps.profileId)
-                val z = ZodiacNumberTables.zodiacForNumber(n, group)
-                ps.zodiacSubtotals[z] ?: 0L
-            }
+        val totals = (0 until 49).map { index ->
+            profileRows.sumOf { (_, values) -> values[index] }
         }
         val grandTotal = totals.sum()
 
