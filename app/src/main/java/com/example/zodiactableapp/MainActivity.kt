@@ -357,11 +357,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * 号码价值表每档 49 个值的调整：
-     * 取本档第三小的值，49 个值统一减去它，小于 0 的置 0。
-     * 效果等价于“倒数第一小、倒数第二小、倒数第三小都变成 0”。
+     * 对一行 49 个值做扣减：取第三小值，每个值减去它，小于 0 的置 0。
+     * 等价于把倒数第一小、倒数第二小、倒数第三小都变成 0。
      */
-    private fun adjustNumberValueRow(values: List<Long>): List<Long> {
+    private fun subtractThirdSmallest(values: List<Long>): List<Long> {
         if (values.size < 3) return values
         val thirdSmallest = values.sorted()[2]
         return values.map { (it - thirdSmallest).coerceAtLeast(0L) }
@@ -379,20 +378,25 @@ class MainActivity : AppCompatActivity() {
         hsv.addView(table)
         content.addView(hsv)
 
-        // 先算好每个档案的 49 个值，按“减去本档第三小值、前两小置零”调整后再汇总
+        // 先算好每个档案的 49 个值 + 汇总（保留 Long，末尾再追加“总金额”列）
         val profileRows = subtotals.sortedBy { it.profileId }.map { ps ->
             val group = ZodiacNumberTables.groupIndexForProfile(ps.profileId)
             val values = (1..49).map { n ->
                 val z = ZodiacNumberTables.zodiacForNumber(n, group)
                 ps.zodiacSubtotals[z] ?: 0L
             }
-            ps.profileId to adjustNumberValueRow(values)
+            ps.profileId to values
         }
 
-        val totals = (0 until 49).map { index ->
-            profileRows.sumOf { (_, values) -> values[index] }
+        val totals = (1..49).map { n ->
+            subtotals.sumOf { ps ->
+                val group = ZodiacNumberTables.groupIndexForProfile(ps.profileId)
+                val z = ZodiacNumberTables.zodiacForNumber(n, group)
+                ps.zodiacSubtotals[z] ?: 0L
+            }
         }
         val grandTotal = totals.sum()
+        val adjustedTotals = subtractThirdSmallest(totals)
 
         // 对话框：49 列横向滑动（不折叠），末尾加“总金额”
         table.addView(makeNumberRow("档案", (1..49).map { it.toString() } + "总金额", bold = true))
@@ -402,6 +406,13 @@ class MainActivity : AppCompatActivity() {
             )
         }
         table.addView(makeNumberRow("汇总", totals.map { it.toString() } + grandTotal.toString(), bold = true))
+        table.addView(
+            makeNumberRow(
+                "汇总调整",
+                adjustedTotals.map { it.toString() } + adjustedTotals.sum().toString(),
+                bold = true
+            )
+        )
 
         AlertDialog.Builder(this)
             .setTitle("号码价值表（$dateKey · 1-49 × ${subtotals.size} 档案）")
@@ -423,6 +434,7 @@ class MainActivity : AppCompatActivity() {
         totals: List<Long>,
         grandTotal: Long
     ): LinearLayout {
+        val adjustedTotals = subtractThirdSmallest(totals)
         val table = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(8), dp(8), dp(8), dp(8))
@@ -443,6 +455,7 @@ class MainActivity : AppCompatActivity() {
             table.addView(makeNumberRow("档$pid", values.subList(0, 25).map { it.toString() }, bold = false))
         }
         table.addView(makeNumberRow("汇总", totals.subList(0, 25).map { it.toString() }, bold = true))
+        table.addView(makeNumberRow("汇总调整", adjustedTotals.subList(0, 25).map { it.toString() }, bold = true))
         // 下半：26..49（末尾加“总金额”）
         table.addView(makeNumberRow("档案", (26..49).map { it.toString() } + "总金额", bold = true))
         profileRows.forEach { (pid, values) ->
@@ -451,6 +464,13 @@ class MainActivity : AppCompatActivity() {
             )
         }
         table.addView(makeNumberRow("汇总", totals.subList(25, 49).map { it.toString() } + grandTotal.toString(), bold = true))
+        table.addView(
+            makeNumberRow(
+                "汇总调整",
+                adjustedTotals.subList(25, 49).map { it.toString() } + adjustedTotals.sum().toString(),
+                bold = true
+            )
+        )
         return table
     }
 

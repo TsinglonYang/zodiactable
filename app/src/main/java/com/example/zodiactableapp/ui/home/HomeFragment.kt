@@ -249,7 +249,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                     level = sharedVM.getGroupLevelForDate(gid, dateKey),
                     zodiacs = members.toList(),
                     showNumbers = true,
-                    onEdit = null,
+                    onEdit = { showGroupLevelDialog(order, index, gid) },
                     amountPerZodiac = sharedVM.amountPerZodiacForDate(gid, dateKey)
                 )
             )
@@ -438,6 +438,28 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         card.addView(grid)
 
         return card
+    }
+
+    /** 单张单模式：只调整该小组在当前查看日期的实时等级，不修改生肖组合 */
+    private fun showGroupLevelDialog(order: BetOrder, index: Int, groupId: Int) {
+        val dateKey = sharedVM.getSelectedDate()
+        val currentLevel = sharedVM.getGroupLevelForDate(groupId, dateKey)
+        val lvNames = (1..15).map { "Lv$it" }.toTypedArray()
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("修改第 ${index + 1} 组等级（$dateKey）")
+            .setSingleChoiceItems(lvNames, currentLevel - 1) { dialog, which ->
+                sharedVM.updateOrderGroupCurrentLevel(
+                    orderId = order.id,
+                    index = index,
+                    newMembers = sharedVM.getGroupMembers(groupId),
+                    newLevel = which + 1
+                )
+                toast("第 ${index + 1} 组已改为 Lv${which + 1}")
+                dialog.dismiss()
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun showEditOneGroupDialog(order: BetOrder, index: Int, oldGroupId: Int) {
