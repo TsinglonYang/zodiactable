@@ -21,6 +21,7 @@ import com.example.zodiactableapp.model.Zodiac
 import com.example.zodiactableapp.model.ZodiacNumberTables
 import com.example.zodiactableapp.shared.BetOrder
 import com.example.zodiactableapp.shared.BetSharedViewModel
+import com.example.zodiactableapp.shared.GroupLevelEngine
 import com.example.zodiactableapp.ui.localizedDatePickerContext
 import com.example.zodiactableapp.ui.showLocalized
 import java.util.Calendar
@@ -39,7 +40,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
 
     // ======= 正在创建中的“新大单” =======
     private val buildingGroupIds = mutableListOf<Int>()
-    private val buildingInitLevels = mutableMapOf<Int, Int>() // 1..15
+    private val buildingInitLevels = mutableMapOf<Int, Int>() // 1..9
 
     /** d1/d2/d3 构建：只保留一张单，禁止新增、删除、改单号/改内容 */
     private val singleOrderMode = BuildConfig.SEED_ORDER_NO in 1..3
@@ -444,7 +445,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     private fun showGroupLevelDialog(order: BetOrder, index: Int, groupId: Int) {
         val dateKey = sharedVM.getSelectedDate()
         val currentLevel = sharedVM.getGroupLevelForDate(groupId, dateKey)
-        val lvNames = (1..15).map { "Lv$it" }.toTypedArray()
+        val lvNames = (1..GroupLevelEngine.MAX_LEVEL).map { "Lv$it" }.toTypedArray()
 
         AlertDialog.Builder(requireContext())
             .setTitle("修改第 ${index + 1} 组等级（$dateKey）")
@@ -484,11 +485,11 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         val sp4 = spinner().apply { setSelection(zodiacs.indexOf(oldMembers.getOrNull(3))) }
 
         val spLv = Spinner(requireContext()).apply {
-            val levels = (1..15).map { "Lv$it" }
+            val levels = (1..GroupLevelEngine.MAX_LEVEL).map { "Lv$it" }
             adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, levels).also {
                 it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             }
-            setSelection((oldLevel - 1).coerceIn(0, 14))
+            setSelection((oldLevel - 1).coerceIn(0, GroupLevelEngine.MAX_LEVEL - 1))
         }
 
         val root = LinearLayout(requireContext()).apply {
@@ -571,7 +572,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     }
 
     private fun pickInitialLevel(defaultLv: Int = 1, onDone: (Int) -> Unit) {
-        val lvNames = (1..15).map { "Lv$it" }.toTypedArray()
+        val lvNames = (1..GroupLevelEngine.MAX_LEVEL).map { "Lv$it" }.toTypedArray()
         AlertDialog.Builder(requireContext())
             .setTitle("设置初始等级")
             .setSingleChoiceItems(lvNames, defaultLv - 1) { dialog, which ->

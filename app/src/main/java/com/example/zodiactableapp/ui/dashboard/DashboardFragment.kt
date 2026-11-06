@@ -23,6 +23,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.zodiactableapp.R
 import com.example.zodiactableapp.model.Zodiac
 import com.example.zodiactableapp.shared.BetSharedViewModel
+import com.example.zodiactableapp.shared.GroupLevelEngine
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -180,7 +181,7 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
 
         groupIds.take(15).forEachIndexed { index, gid ->
             val members = sharedVM.getGroupMembers(gid)
-            val level = sharedVM.getGroupLevelForDate(gid, dateKey) // 1..15
+            val level = sharedVM.getGroupLevelForDate(gid, dateKey) // 1..9
             val money = moneyForLevel(level, members, yearZodiac)
 
             val values = MutableList<Int?>(zodiacList.size) { null }
@@ -208,7 +209,7 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
     }
 
     private fun moneyForLevel(level: Int, members: Set<Zodiac>, yearZodiac: Zodiac?): Int {
-        val lv = level.coerceIn(1, 15)
+        val lv = level.coerceIn(GroupLevelEngine.MIN_LEVEL, GroupLevelEngine.MAX_LEVEL)
         val idx = lv - 1
         val useB = (yearZodiac != null && members.contains(yearZodiac))
         return if (useB) amountsTypeB[idx] else amountsTypeA[idx]

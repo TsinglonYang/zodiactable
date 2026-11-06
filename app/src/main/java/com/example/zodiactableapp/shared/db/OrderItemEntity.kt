@@ -24,5 +24,5 @@ data class OrderItemEntity(
     val orderId: Long,
     val pos: Int,       // 1..15
     val groupId: Int,   // 0..494
-    val initLevel: Int  // 1..15
+    val initLevel: Int  // 1..9
 )

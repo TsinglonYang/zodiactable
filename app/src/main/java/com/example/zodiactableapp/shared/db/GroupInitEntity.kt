@@ -10,5 +10,5 @@ import androidx.room.PrimaryKey
 data class GroupInitEntity(
     @PrimaryKey val groupId: Int,      // 0..494
     val activationDateKey: String,     // yyyy-MM-dd
-    val initLevel: Int                 // 1..15
+    val initLevel: Int                 // 1..9
 )

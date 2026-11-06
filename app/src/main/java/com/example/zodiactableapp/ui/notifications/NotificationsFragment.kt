@@ -20,6 +20,7 @@ import com.example.zodiactableapp.R
 import com.example.zodiactableapp.model.Zodiac
 import com.example.zodiactableapp.model.ZodiacNumberTables
 import com.example.zodiactableapp.shared.BetSharedViewModel
+import com.example.zodiactableapp.shared.GroupLevelEngine
 import com.example.zodiactableapp.ui.localizedDatePickerContext
 import com.example.zodiactableapp.ui.showLocalized
 import java.io.File
@@ -65,14 +66,14 @@ class NotificationsFragment : Fragment(R.layout.fragment_notifications) {
 
     private val zodiacList = Zodiac.values().toList()
 
-    // 1–15级：第一类
+    // 1–9级：第一类
     private val amountA = intArrayOf(
         10, 15, 25, 35, 55,
         80, 125, 190, 290, 440,
         665, 1010, 1530, 2320, 3530
     )
 
-    // 1–15级：第二类（当年生肖在该小组中）
+    // 1–9级：第二类（当年生肖在该小组中）
     private val amountB = intArrayOf(
         10, 20, 30, 45, 70,
         110, 175, 270, 425, 670,
@@ -293,7 +294,7 @@ class NotificationsFragment : Fragment(R.layout.fragment_notifications) {
     }
 
     private fun moneyByLevel(level: Int, members: Set<Zodiac>, yearZodiac: Zodiac): Int {
-        val lv = level.coerceIn(1, 15)
+        val lv = level.coerceIn(GroupLevelEngine.MIN_LEVEL, GroupLevelEngine.MAX_LEVEL)
         val useB = members.contains(yearZodiac)
         val arr = if (useB) amountB else amountA
         return arr[lv - 1]
