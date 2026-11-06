@@ -42,8 +42,8 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     private val buildingGroupIds = mutableListOf<Int>()
     private val buildingInitLevels = mutableMapOf<Int, Int>() // 1..9
 
-    /** d1/d2/d3 构建：只保留一张单，禁止新增、删除、改单号/改内容 */
-    private val singleOrderMode = BuildConfig.SEED_ORDER_NO in 1..3
+    /** s1/s2 构建：只保留一张单，禁止新增、删除、改单号/改内容 */
+    private val singleOrderMode = BuildConfig.SEED_ORDER_NO in 1..2
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         tvCurrentProfile = view.findViewById(R.id.tvCurrentProfile)
@@ -100,7 +100,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         }
 
         sharedVM.currentProfile.observe(viewLifecycleOwner) {
-            tvCurrentProfile.text = "当前应用：${sharedVM.getCurrentProfileId()}生肖投注助手"
+            tvCurrentProfile.text = "当前应用：${sharedVM.getCurrentProfileId()}号 ${getString(R.string.app_name)}"
             buildingGroupIds.clear()
             buildingInitLevels.clear()
             renderOrders(sharedVM.orders.value ?: emptyList())

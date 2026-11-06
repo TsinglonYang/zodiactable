@@ -49,7 +49,7 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         private const val PROFILE_META_PREFS = "zodiac_table_prefs"
         private const val KEY_YEAR_ZODIAC_PREFIX = "year_zodiac_profile_"
         private const val LEGACY_DB_NAME = "zodiac_table.db"
-        private const val ALL_SEED_ORDER_COUNT = 3
+        private const val ALL_SEED_ORDER_COUNT = 2
         private const val LEGACY_SEED_ORDER_COUNT = 15
         private const val DEFAULT_SEED_VERSION = 2
         private const val DEFAULT_SEED_DATE = "2026-01-01"
@@ -57,7 +57,7 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         private const val SEED_ORDER_ID_BASE = 1700000000000L
         private const val DRAW_NUMBER_PREFIX = "draw_number_"
 
-        /** 单张单模式：d1/d2/d3 构建；旧的 app1..app10 为 0，保持 3 张单 */
+        /** 单张单模式：s1/s2 构建；旧的 app1..app10 为 0，保持 2 张单 */
         private val SINGLE_ORDER_MODE: Boolean =
             BuildConfig.SEED_ORDER_NO in 1..ALL_SEED_ORDER_COUNT
 
@@ -829,39 +829,21 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         ),
         // 第2号单：15 组；每只生肖恰好出现 5 次，任意两只生肖至少同组一次
         listOf(
-            SeedItem(setOf(Zodiac.鼠, Zodiac.牛, Zodiac.兔, Zodiac.狗), 1),
-            SeedItem(setOf(Zodiac.鼠, Zodiac.牛, Zodiac.龙, Zodiac.马), 1),
-            SeedItem(setOf(Zodiac.鼠, Zodiac.虎, Zodiac.蛇, Zodiac.猪), 1),
-            SeedItem(setOf(Zodiac.鼠, Zodiac.兔, Zodiac.猴, Zodiac.鸡), 1),
-            SeedItem(setOf(Zodiac.鼠, Zodiac.羊, Zodiac.猴, Zodiac.鸡), 1),
-            SeedItem(setOf(Zodiac.牛, Zodiac.虎, Zodiac.龙, Zodiac.鸡), 1),
-            SeedItem(setOf(Zodiac.牛, Zodiac.虎, Zodiac.猴, Zodiac.猪), 1),
-            SeedItem(setOf(Zodiac.牛, Zodiac.蛇, Zodiac.羊, Zodiac.狗), 1),
-            SeedItem(setOf(Zodiac.虎, Zodiac.兔, Zodiac.龙, Zodiac.羊), 1),
-            SeedItem(setOf(Zodiac.虎, Zodiac.马, Zodiac.羊, Zodiac.狗), 1),
-            SeedItem(setOf(Zodiac.兔, Zodiac.龙, Zodiac.蛇, Zodiac.猪), 1),
-            SeedItem(setOf(Zodiac.兔, Zodiac.蛇, Zodiac.马, Zodiac.猴), 1),
-            SeedItem(setOf(Zodiac.龙, Zodiac.猴, Zodiac.狗, Zodiac.猪), 1),
-            SeedItem(setOf(Zodiac.蛇, Zodiac.马, Zodiac.鸡, Zodiac.狗), 1),
-            SeedItem(setOf(Zodiac.马, Zodiac.羊, Zodiac.鸡, Zodiac.猪), 1)
-        ),
-        // 第3号单：15 组；每只生肖恰好出现 5 次，任意两只生肖至少同组一次
-        listOf(
-            SeedItem(setOf(Zodiac.鼠, Zodiac.牛, Zodiac.羊, Zodiac.猪), 1),
-            SeedItem(setOf(Zodiac.鼠, Zodiac.虎, Zodiac.蛇, Zodiac.羊), 1),
-            SeedItem(setOf(Zodiac.鼠, Zodiac.虎, Zodiac.马, Zodiac.鸡), 1),
-            SeedItem(setOf(Zodiac.鼠, Zodiac.兔, Zodiac.龙, Zodiac.马), 1),
-            SeedItem(setOf(Zodiac.鼠, Zodiac.蛇, Zodiac.猴, Zodiac.狗), 1),
-            SeedItem(setOf(Zodiac.牛, Zodiac.虎, Zodiac.龙, Zodiac.猴), 1),
-            SeedItem(setOf(Zodiac.牛, Zodiac.兔, Zodiac.龙, Zodiac.蛇), 1),
-            SeedItem(setOf(Zodiac.牛, Zodiac.兔, Zodiac.猴, Zodiac.鸡), 1),
-            SeedItem(setOf(Zodiac.牛, Zodiac.蛇, Zodiac.马, Zodiac.狗), 1),
-            SeedItem(setOf(Zodiac.虎, Zodiac.兔, Zodiac.羊, Zodiac.猴), 1),
-            SeedItem(setOf(Zodiac.虎, Zodiac.龙, Zodiac.狗, Zodiac.猪), 1),
-            SeedItem(setOf(Zodiac.兔, Zodiac.鸡, Zodiac.狗, Zodiac.猪), 1),
-            SeedItem(setOf(Zodiac.龙, Zodiac.羊, Zodiac.鸡, Zodiac.狗), 1),
-            SeedItem(setOf(Zodiac.蛇, Zodiac.马, Zodiac.鸡, Zodiac.猪), 1),
-            SeedItem(setOf(Zodiac.马, Zodiac.羊, Zodiac.猴, Zodiac.猪), 1)
+            SeedItem(setOf(Zodiac.鼠, Zodiac.牛, Zodiac.马, Zodiac.狗), 1),
+            SeedItem(setOf(Zodiac.鼠, Zodiac.牛, Zodiac.羊, Zodiac.猴), 1),
+            SeedItem(setOf(Zodiac.鼠, Zodiac.虎, Zodiac.羊, Zodiac.鸡), 1),
+            SeedItem(setOf(Zodiac.鼠, Zodiac.虎, Zodiac.猴, Zodiac.猪), 1),
+            SeedItem(setOf(Zodiac.鼠, Zodiac.兔, Zodiac.龙, Zodiac.蛇), 1),
+            SeedItem(setOf(Zodiac.牛, Zodiac.虎, Zodiac.龙, Zodiac.蛇), 1),
+            SeedItem(setOf(Zodiac.牛, Zodiac.兔, Zodiac.鸡, Zodiac.狗), 1),
+            SeedItem(setOf(Zodiac.牛, Zodiac.蛇, Zodiac.马, Zodiac.猪), 1),
+            SeedItem(setOf(Zodiac.虎, Zodiac.兔, Zodiac.鸡, Zodiac.猪), 1),
+            SeedItem(setOf(Zodiac.虎, Zodiac.马, Zodiac.猴, Zodiac.狗), 1),
+            SeedItem(setOf(Zodiac.兔, Zodiac.龙, Zodiac.马, Zodiac.羊), 1),
+            SeedItem(setOf(Zodiac.兔, Zodiac.蛇, Zodiac.猴, Zodiac.猪), 1),
+            SeedItem(setOf(Zodiac.龙, Zodiac.马, Zodiac.猴, Zodiac.鸡), 1),
+            SeedItem(setOf(Zodiac.龙, Zodiac.羊, Zodiac.狗, Zodiac.猪), 1),
+            SeedItem(setOf(Zodiac.蛇, Zodiac.羊, Zodiac.鸡, Zodiac.狗), 1)
         )
     )
 

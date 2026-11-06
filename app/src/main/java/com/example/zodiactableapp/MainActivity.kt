@@ -172,12 +172,12 @@ class MainActivity : AppCompatActivity() {
 
             addView(ImageView(context).apply {
                 setImageResource(R.mipmap.ic_launcher)
-                contentDescription = "${profileId}生肖投注助手"
+                contentDescription = "${profileId}号 ${getString(R.string.app_name)}"
                 layoutParams = LinearLayout.LayoutParams(dp(64), dp(64))
             })
 
             addView(TextView(context).apply {
-                text = "${profileId}生肖投注助手"
+                text = "${profileId}号 ${getString(R.string.app_name)}"
                 textSize = 13f
                 gravity = Gravity.CENTER
                 maxLines = 2
@@ -265,7 +265,7 @@ class MainActivity : AppCompatActivity() {
         val nextProfileId = (sharedVM.getProfileIds().maxOrNull() ?: 0) + 1
         AlertDialog.Builder(this)
             .setTitle("创建新应用")
-            .setMessage("是否创建 ${nextProfileId}生肖投注助手？")
+            .setMessage("是否创建 ${nextProfileId}号 ${getString(R.string.app_name)}？")
             .setNegativeButton("取消", null)
             .setPositiveButton("创建") { _, _ ->
                 val newProfileId = sharedVM.createProfile()
@@ -277,7 +277,7 @@ class MainActivity : AppCompatActivity() {
     private fun confirmDeleteProfile(profileId: Int) {
         AlertDialog.Builder(this)
             .setTitle("删除应用")
-            .setMessage("是否删除 ${profileId}生肖投注助手？删除后该应用的大单、等级和开奖记录都会被清除。")
+            .setMessage("是否删除 ${profileId}号 ${getString(R.string.app_name)}？删除后该应用的大单、等级和开奖记录都会被清除。")
             .setNegativeButton("取消", null)
             .setPositiveButton("删除") { _, _ ->
                 val deleted = sharedVM.deleteProfile(profileId)

@@ -10,7 +10,7 @@
         android:id="@+id/tvCurrentProfile"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="当前应用：1生肖投注助手"
+        android:text="当前应用：1号 双单助手"
         android:textSize="18sp"
         android:textStyle="bold" />
 

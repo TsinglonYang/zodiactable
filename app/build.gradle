@@ -18,10 +18,10 @@ android {
         applicationId "com.example.zodiactableapp11"
         minSdk 21
         targetSdk 36
-        versionCode 8
-        versionName "3.2.0"
+        versionCode 9
+        versionName "4.0.0"
 
-        // 0 = 保留全部 3 张默认单；1/2/3 = 单张单模式（对应 第1/2/3号单）
+        // 0 = 保留全部 2 张默认单；1/2 = 单张单模式（对应 第1/2号单）
         buildConfigField "int", "SEED_ORDER_NO", "0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -81,24 +81,18 @@ android {
             applicationIdSuffix ".app10"
             resValue "string", "app_name", "生肖投注助手"
         }
-        // 拆分后的 3 个单张单应用：只保留对应的一张默认单
-        d1 {
+        // 双单版：两个独立的单张单应用，各保留对应的一张默认单
+        s1 {
             dimension "edition"
-            applicationIdSuffix ".d1"
-            resValue "string", "app_name", "第1号单"
+            applicationIdSuffix ".s1"
+            resValue "string", "app_name", "双单·壹"
             buildConfigField "int", "SEED_ORDER_NO", "1"
         }
-        d2 {
+        s2 {
             dimension "edition"
-            applicationIdSuffix ".d2"
-            resValue "string", "app_name", "第2号单"
+            applicationIdSuffix ".s2"
+            resValue "string", "app_name", "双单·贰"
             buildConfigField "int", "SEED_ORDER_NO", "2"
-        }
-        d3 {
-            dimension "edition"
-            applicationIdSuffix ".d3"
-            resValue "string", "app_name", "第3号单"
-            buildConfigField "int", "SEED_ORDER_NO", "3"
         }
     }
 
