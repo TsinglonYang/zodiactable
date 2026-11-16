@@ -28,7 +28,7 @@ import java.util.Locale
 data class BetOrder(
     val id: Long,
     var orderNo: Int,
-    val groupIds: List<Int>,      // 顺序=pos(1..15)
+    val groupIds: List<Int>,      // 顺序=pos(1..12)
     val createdDateKey: String
 )
 
@@ -42,6 +42,8 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
         const val INITIAL_PROFILE_COUNT = 12
+        /** 每张大单固定 12 个小组 */
+        const val GROUPS_PER_ORDER = 12
         private const val PROFILE_PREFS = "workspace_prefs"
         private const val KEY_CURRENT_PROFILE = "current_profile"
         private const val KEY_PROFILE_IDS = "profile_ids"
@@ -49,15 +51,15 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         private const val PROFILE_META_PREFS = "zodiac_table_prefs"
         private const val KEY_YEAR_ZODIAC_PREFIX = "year_zodiac_profile_"
         private const val LEGACY_DB_NAME = "zodiac_table.db"
-        private const val ALL_SEED_ORDER_COUNT = 2
+        private const val ALL_SEED_ORDER_COUNT = 4
         private const val LEGACY_SEED_ORDER_COUNT = 15
-        private const val DEFAULT_SEED_VERSION = 2
+        private const val DEFAULT_SEED_VERSION = 3
         private const val DEFAULT_SEED_DATE = "2026-01-01"
         private const val KEY_DEFAULT_SEED_VERSION_PREFIX = "default_seed_version_"
         private const val SEED_ORDER_ID_BASE = 1700000000000L
         private const val DRAW_NUMBER_PREFIX = "draw_number_"
 
-        /** 单张单模式：s1/s2 构建；旧的 app1..app10 为 0，保持 2 张单 */
+        /** 单张单模式：s1/s2 构建；SEED_ORDER_NO 为 0 时使用全部默认单 */
         private val SINGLE_ORDER_MODE: Boolean =
             BuildConfig.SEED_ORDER_NO in 1..ALL_SEED_ORDER_COUNT
 
@@ -281,7 +283,6 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
 
         val dates = dateSet.toList().sorted()
         val levels = IntArray(GroupLevelEngine.GROUP_COUNT) { GroupLevelEngine.MIN_LEVEL }
-        val fixedAtFive = BooleanArray(GroupLevelEngine.GROUP_COUNT)
         val activeBet = BooleanArray(GroupLevelEngine.GROUP_COUNT) { false }
 
         for (d in dates) {
@@ -293,27 +294,24 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
                         GroupLevelEngine.MIN_LEVEL,
                         GroupLevelEngine.MAX_LEVEL
                     )
-                    fixedAtFive[gid] = false
                 }
             }
 
             // 2) 当天有开奖才推进
             val draw = draws[d]
             if (draw != null) {
-                val next = engine.evolveOneDay(levels, fixedAtFive, activeBet, draw)
+                val next = engine.evolveOneDay(levels, activeBet, draw)
                 for (i in levels.indices) {
                     levels[i] = next.levels[i]
-                    fixedAtFive[i] = next.fixedAtFive[i]
                 }
             }
 
-            // ✅ 3) 当天手动修改“实时等级”：在当天推演后覆盖，影响后续日期（手动修改会解除固定）
+            // ✅ 3) 当天手动修改“实时等级”：在当天推演后覆盖，影响后续日期
             val overridesToday = levelOverrides[d]
             if (!overridesToday.isNullOrEmpty()) {
                 overridesToday.forEach { (gid, lv) ->
                     if (gid in 0 until GroupLevelEngine.GROUP_COUNT) {
                         levels[gid] = lv.coerceIn(GroupLevelEngine.MIN_LEVEL, GroupLevelEngine.MAX_LEVEL)
-                        fixedAtFive[gid] = false
                     }
                 }
             }
@@ -326,7 +324,7 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
     // ========= 对外：新增/删除/改序号/选中 =========
 
     /**
-     * 新增一单（15 个 groupId）并为每个小组设置初始等级（1..9）
+     * 新增一单（12 个 groupId）并为每个小组设置初始等级（1..15）
      * createdDateKey = 当前 selectedDate
      */
     fun addOrder(
@@ -334,8 +332,8 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         initLevels: Map<Int, Int>
     ) {
         require(!SINGLE_ORDER_MODE) { "当前应用只允许一张单" }
-        val cleaned = groupIds.distinct().take(15)
-        require(cleaned.size == 15) { "一单必须正好 15 个小组" }
+        val cleaned = groupIds.distinct().take(GROUPS_PER_ORDER)
+        require(cleaned.size == GROUPS_PER_ORDER) { "一单必须正好 $GROUPS_PER_ORDER 个小组" }
         require(cleaned.all { it in 0 until GroupLevelEngine.GROUP_COUNT }) { "存在非法 groupId" }
         require(cleaned.all { !isGroupUsed(it) }) { "存在已被其他大组使用的小组" }
 
@@ -468,8 +466,8 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
 
     // ========= ✅ Home“编辑”用：改生肖 + 改“当前日期实时等级” =========
     /**
-     * @param index 0..14（对应 pos=1..15）
-     * @param newLevel 1..9（实时等级覆盖）
+     * @param index 0..11（对应 pos=1..12）
+     * @param newLevel 1..15（实时等级覆盖）
      */
     fun updateOrderGroupCurrentLevel(
         orderId: Long,
@@ -477,7 +475,7 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         newMembers: Set<Zodiac>,
         newLevel: Int
     ) {
-        require(index in 0 until 15) { "index 必须在 0..14" }
+        require(index in 0 until GROUPS_PER_ORDER) { "index 必须在 0..${GROUPS_PER_ORDER - 1}" }
         require(newMembers.size == 4) { "必须是4个不重复生肖" }
 
         val order = ordersInternal.firstOrNull { it.id == orderId }
@@ -555,7 +553,7 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         initialLevel[groupId] = level.coerceIn(GroupLevelEngine.MIN_LEVEL, GroupLevelEngine.MAX_LEVEL)
     }
 
-    // ========= ✅ 首次启动：恢复 + 若DB空则注入默认15单 =========
+    // ========= ✅ 首次启动：恢复 + 若DB空则注入默认单 =========
     init {
         loadActiveProfile()
     }
@@ -792,7 +790,7 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
                 ordersInternal.all { it.id in seedOrderIds }
 
             if (ordersInternal.isEmpty() || isPartialDefaultSeed) {
-                seedDefault15OrdersToDb(existingSeedIds)
+                seedDefaultOrdersToDb(existingSeedIds)
                 markDefaultSeedCurrent(profileId)
                 restoreFromDb()
             }
@@ -809,50 +807,74 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         seedOrderNumbers().map { defaultSeedOrderId(it) }.toSet()
 
     private fun defaultSeedItems(): List<List<SeedItem>> = listOf(
-        // 第1号单：15 组；每只生肖恰好出现 5 次，任意两只生肖至少同组一次
+        // 第1号单：12 组；每只生肖恰好出现 4 次
         listOf(
-            SeedItem(setOf(Zodiac.鼠, Zodiac.牛, Zodiac.虎, Zodiac.兔), 1),
-            SeedItem(setOf(Zodiac.鼠, Zodiac.虎, Zodiac.蛇, Zodiac.狗), 1),
-            SeedItem(setOf(Zodiac.鼠, Zodiac.兔, Zodiac.马, Zodiac.猴), 1),
-            SeedItem(setOf(Zodiac.鼠, Zodiac.龙, Zodiac.鸡, Zodiac.猪), 1),
-            SeedItem(setOf(Zodiac.鼠, Zodiac.蛇, Zodiac.羊, Zodiac.猪), 1),
-            SeedItem(setOf(Zodiac.牛, Zodiac.兔, Zodiac.龙, Zodiac.猪), 1),
-            SeedItem(setOf(Zodiac.牛, Zodiac.蛇, Zodiac.猴, Zodiac.鸡), 1),
-            SeedItem(setOf(Zodiac.牛, Zodiac.马, Zodiac.羊, Zodiac.鸡), 1),
-            SeedItem(setOf(Zodiac.牛, Zodiac.猴, Zodiac.狗, Zodiac.猪), 1),
-            SeedItem(setOf(Zodiac.虎, Zodiac.龙, Zodiac.羊, Zodiac.猴), 1),
-            SeedItem(setOf(Zodiac.虎, Zodiac.龙, Zodiac.鸡, Zodiac.狗), 1),
+            SeedItem(setOf(Zodiac.鼠, Zodiac.牛, Zodiac.蛇, Zodiac.羊), 1),
+            SeedItem(setOf(Zodiac.鼠, Zodiac.虎, Zodiac.龙, Zodiac.马), 1),
+            SeedItem(setOf(Zodiac.鼠, Zodiac.兔, Zodiac.龙, Zodiac.狗), 1),
+            SeedItem(setOf(Zodiac.鼠, Zodiac.羊, Zodiac.猴, Zodiac.鸡), 1),
+            SeedItem(setOf(Zodiac.牛, Zodiac.虎, Zodiac.兔, Zodiac.猴), 1),
+            SeedItem(setOf(Zodiac.牛, Zodiac.龙, Zodiac.蛇, Zodiac.猪), 1),
+            SeedItem(setOf(Zodiac.牛, Zodiac.马, Zodiac.猴, Zodiac.狗), 1),
+            SeedItem(setOf(Zodiac.虎, Zodiac.兔, Zodiac.蛇, Zodiac.鸡), 1),
             SeedItem(setOf(Zodiac.虎, Zodiac.马, Zodiac.羊, Zodiac.猪), 1),
-            SeedItem(setOf(Zodiac.兔, Zodiac.蛇, Zodiac.马, Zodiac.鸡), 1),
-            SeedItem(setOf(Zodiac.兔, Zodiac.羊, Zodiac.猴, Zodiac.狗), 1),
-            SeedItem(setOf(Zodiac.龙, Zodiac.蛇, Zodiac.马, Zodiac.狗), 1)
+            SeedItem(setOf(Zodiac.兔, Zodiac.羊, Zodiac.狗, Zodiac.猪), 1),
+            SeedItem(setOf(Zodiac.龙, Zodiac.猴, Zodiac.鸡, Zodiac.猪), 1),
+            SeedItem(setOf(Zodiac.蛇, Zodiac.马, Zodiac.鸡, Zodiac.狗), 1)
         ),
-        // 第2号单：15 组；每只生肖恰好出现 5 次，任意两只生肖至少同组一次
+        // 第2号单：12 组；每只生肖恰好出现 4 次
         listOf(
-            SeedItem(setOf(Zodiac.鼠, Zodiac.牛, Zodiac.马, Zodiac.狗), 1),
-            SeedItem(setOf(Zodiac.鼠, Zodiac.牛, Zodiac.羊, Zodiac.猴), 1),
-            SeedItem(setOf(Zodiac.鼠, Zodiac.虎, Zodiac.羊, Zodiac.鸡), 1),
-            SeedItem(setOf(Zodiac.鼠, Zodiac.虎, Zodiac.猴, Zodiac.猪), 1),
-            SeedItem(setOf(Zodiac.鼠, Zodiac.兔, Zodiac.龙, Zodiac.蛇), 1),
-            SeedItem(setOf(Zodiac.牛, Zodiac.虎, Zodiac.龙, Zodiac.蛇), 1),
-            SeedItem(setOf(Zodiac.牛, Zodiac.兔, Zodiac.鸡, Zodiac.狗), 1),
-            SeedItem(setOf(Zodiac.牛, Zodiac.蛇, Zodiac.马, Zodiac.猪), 1),
-            SeedItem(setOf(Zodiac.虎, Zodiac.兔, Zodiac.鸡, Zodiac.猪), 1),
-            SeedItem(setOf(Zodiac.虎, Zodiac.马, Zodiac.猴, Zodiac.狗), 1),
-            SeedItem(setOf(Zodiac.兔, Zodiac.龙, Zodiac.马, Zodiac.羊), 1),
-            SeedItem(setOf(Zodiac.兔, Zodiac.蛇, Zodiac.猴, Zodiac.猪), 1),
-            SeedItem(setOf(Zodiac.龙, Zodiac.马, Zodiac.猴, Zodiac.鸡), 1),
-            SeedItem(setOf(Zodiac.龙, Zodiac.羊, Zodiac.狗, Zodiac.猪), 1),
-            SeedItem(setOf(Zodiac.蛇, Zodiac.羊, Zodiac.鸡, Zodiac.狗), 1)
+            SeedItem(setOf(Zodiac.鼠, Zodiac.牛, Zodiac.龙, Zodiac.猴), 1),
+            SeedItem(setOf(Zodiac.鼠, Zodiac.牛, Zodiac.鸡, Zodiac.狗), 1),
+            SeedItem(setOf(Zodiac.鼠, Zodiac.虎, Zodiac.兔, Zodiac.羊), 1),
+            SeedItem(setOf(Zodiac.鼠, Zodiac.龙, Zodiac.蛇, Zodiac.鸡), 1),
+            SeedItem(setOf(Zodiac.牛, Zodiac.虎, Zodiac.蛇, Zodiac.马), 1),
+            SeedItem(setOf(Zodiac.牛, Zodiac.羊, Zodiac.猴, Zodiac.猪), 1),
+            SeedItem(setOf(Zodiac.虎, Zodiac.兔, Zodiac.龙, Zodiac.猪), 1),
+            SeedItem(setOf(Zodiac.虎, Zodiac.蛇, Zodiac.羊, Zodiac.狗), 1),
+            SeedItem(setOf(Zodiac.兔, Zodiac.马, Zodiac.羊, Zodiac.鸡), 1),
+            SeedItem(setOf(Zodiac.兔, Zodiac.猴, Zodiac.鸡, Zodiac.狗), 1),
+            SeedItem(setOf(Zodiac.龙, Zodiac.马, Zodiac.狗, Zodiac.猪), 1),
+            SeedItem(setOf(Zodiac.蛇, Zodiac.马, Zodiac.猴, Zodiac.猪), 1)
+        ),
+        // 第3号单：12 组；每只生肖恰好出现 4 次
+        listOf(
+            SeedItem(setOf(Zodiac.鼠, Zodiac.虎, Zodiac.鸡, Zodiac.猪), 1),
+            SeedItem(setOf(Zodiac.鼠, Zodiac.兔, Zodiac.蛇, Zodiac.马), 1),
+            SeedItem(setOf(Zodiac.鼠, Zodiac.兔, Zodiac.猴, Zodiac.猪), 1),
+            SeedItem(setOf(Zodiac.鼠, Zodiac.马, Zodiac.羊, Zodiac.狗), 1),
+            SeedItem(setOf(Zodiac.牛, Zodiac.虎, Zodiac.狗, Zodiac.猪), 1),
+            SeedItem(setOf(Zodiac.牛, Zodiac.兔, Zodiac.龙, Zodiac.羊), 1),
+            SeedItem(setOf(Zodiac.牛, Zodiac.兔, Zodiac.蛇, Zodiac.狗), 1),
+            SeedItem(setOf(Zodiac.牛, Zodiac.龙, Zodiac.马, Zodiac.鸡), 1),
+            SeedItem(setOf(Zodiac.虎, Zodiac.龙, Zodiac.蛇, Zodiac.猴), 1),
+            SeedItem(setOf(Zodiac.虎, Zodiac.马, Zodiac.猴, Zodiac.鸡), 1),
+            SeedItem(setOf(Zodiac.龙, Zodiac.羊, Zodiac.猴, Zodiac.狗), 1),
+            SeedItem(setOf(Zodiac.蛇, Zodiac.羊, Zodiac.鸡, Zodiac.猪), 1)
+        ),
+        // 第4号单：12 组；每只生肖恰好出现 4 次
+        listOf(
+            SeedItem(setOf(Zodiac.鼠, Zodiac.牛, Zodiac.马, Zodiac.猪), 1),
+            SeedItem(setOf(Zodiac.鼠, Zodiac.虎, Zodiac.猴, Zodiac.狗), 1),
+            SeedItem(setOf(Zodiac.鼠, Zodiac.龙, Zodiac.羊, Zodiac.猪), 1),
+            SeedItem(setOf(Zodiac.鼠, Zodiac.蛇, Zodiac.狗, Zodiac.猪), 1),
+            SeedItem(setOf(Zodiac.牛, Zodiac.虎, Zodiac.羊, Zodiac.鸡), 1),
+            SeedItem(setOf(Zodiac.牛, Zodiac.兔, Zodiac.鸡, Zodiac.猪), 1),
+            SeedItem(setOf(Zodiac.牛, Zodiac.蛇, Zodiac.猴, Zodiac.鸡), 1),
+            SeedItem(setOf(Zodiac.虎, Zodiac.兔, Zodiac.马, Zodiac.狗), 1),
+            SeedItem(setOf(Zodiac.虎, Zodiac.龙, Zodiac.鸡, Zodiac.狗), 1),
+            SeedItem(setOf(Zodiac.兔, Zodiac.龙, Zodiac.马, Zodiac.猴), 1),
+            SeedItem(setOf(Zodiac.兔, Zodiac.蛇, Zodiac.羊, Zodiac.猴), 1),
+            SeedItem(setOf(Zodiac.龙, Zodiac.蛇, Zodiac.马, Zodiac.羊), 1)
         )
     )
 
     private fun validateDefaultSeed(seed: List<List<SeedItem>>) {
         require(seed.size == ALL_SEED_ORDER_COUNT)
-        require(seed.all { it.size == 15 })
+        require(seed.all { it.size == GROUPS_PER_ORDER })
     }
 
-    private suspend fun seedDefault15OrdersToDb(existingSeedIds: Set<Long> = emptySet()) {
+    private suspend fun seedDefaultOrdersToDb(existingSeedIds: Set<Long> = emptySet()) {
         val seed = defaultSeedItems()
         validateDefaultSeed(seed)
 
@@ -956,9 +978,9 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         return arr[lv - 1]
     }
 
-    /** 首页展开用：整单当日总金额（15 组各 4 个生肖金额之和，与金额页“总金额”一致） */
+    /** 首页展开用：整单当日总金额（12 组各 4 个生肖金额之和，与金额页“总金额”一致） */
     fun totalAmountForDate(order: BetOrder, dateKey: String): Int =
-        order.groupIds.take(15).sumOf { gid ->
+        order.groupIds.take(GROUPS_PER_ORDER).sumOf { gid ->
             amountPerZodiacForDate(gid, dateKey) * getGroupMembers(gid).size
         }
 
@@ -976,7 +998,6 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         levelOverrides.keys.forEach { if (it <= dateKey) dateSet.add(it) }
         val dates = dateSet.toList().sorted()
         val levels = IntArray(GroupLevelEngine.GROUP_COUNT) { GroupLevelEngine.MIN_LEVEL }
-        val fixedAtFive = BooleanArray(GroupLevelEngine.GROUP_COUNT)
         val activeBet = BooleanArray(GroupLevelEngine.GROUP_COUNT) { false }
         for (d in dates) {
             for (gid in 0 until GroupLevelEngine.GROUP_COUNT) {
@@ -985,15 +1006,13 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
                     levels[gid] = initialLevel[gid].coerceIn(
                         GroupLevelEngine.MIN_LEVEL, GroupLevelEngine.MAX_LEVEL
                     )
-                    fixedAtFive[gid] = false
                 }
             }
             val draw = draws[d]
             if (draw != null) {
-                val next = engine.evolveOneDay(levels, fixedAtFive, activeBet, draw)
+                val next = engine.evolveOneDay(levels, activeBet, draw)
                 for (i in levels.indices) {
                     levels[i] = next.levels[i]
-                    fixedAtFive[i] = next.fixedAtFive[i]
                 }
             }
             val overridesToday = levelOverrides[d]
@@ -1001,7 +1020,6 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
                 overridesToday.forEach { (gid, lv) ->
                     if (gid in 0 until GroupLevelEngine.GROUP_COUNT) {
                         levels[gid] = lv.coerceIn(GroupLevelEngine.MIN_LEVEL, GroupLevelEngine.MAX_LEVEL)
-                        fixedAtFive[gid] = false
                     }
                 }
             }
@@ -1090,7 +1108,7 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         val zodiacList = Zodiac.values().toList()
         val subtotalCols = LongArray(zodiacList.size) { 0L }
         for (order in orders) {
-            for (gid in order.groupIds.take(15)) {
+            for (gid in order.groupIds.take(GROUPS_PER_ORDER)) {
                 val members = allGroups[gid]
                 val money = moneyByLevel(levels[gid], members, yearZodiac)
                 for (z in members) subtotalCols[zodiacList.indexOf(z)] += money.toLong()
@@ -1098,7 +1116,7 @@ class BetSharedViewModel(app: Application) : AndroidViewModel(app) {
         }
         val orderCount = orders.size
         return zodiacList.mapIndexed { i, z ->
-            z to (subtotalCols[i] - orderCount.toLong() * 50L)
+            z to (subtotalCols[i] - orderCount.toLong() * 40L)
         }.toMap()
     }
 

@@ -36,7 +36,7 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
     private lateinit var adapter: ZodiacTableAdapter
     private val zodiacList = Zodiac.values().toList()
 
-    // 9级：第一类（不含当年生肖的小组）
+    // 15级：第一类（不含当年生肖的小组）
     private val amountsTypeA = intArrayOf(
         10, 15, 25, 35, 55,
         80, 125, 190, 290, 440,
@@ -44,7 +44,7 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
 
     )
 
-    // 9级：第二类（含当年生肖的小组）
+    // 15级：第二类（含当年生肖的小组）
     private val amountsTypeB = intArrayOf(
         10, 20, 30, 45, 70,
         110, 175, 270, 425, 670,
@@ -179,9 +179,9 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
         val columnSum = IntArray(zodiacList.size) { 0 }
         var totalAmount = 0
 
-        groupIds.take(15).forEachIndexed { index, gid ->
+        groupIds.take(BetSharedViewModel.GROUPS_PER_ORDER).forEachIndexed { index, gid ->
             val members = sharedVM.getGroupMembers(gid)
-            val level = sharedVM.getGroupLevelForDate(gid, dateKey) // 1..9
+            val level = sharedVM.getGroupLevelForDate(gid, dateKey) // 1..15
             val money = moneyForLevel(level, members, yearZodiac)
 
             val values = MutableList<Int?>(zodiacList.size) { null }

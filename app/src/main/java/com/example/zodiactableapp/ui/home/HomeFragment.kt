@@ -18,7 +18,6 @@ import androidx.navigation.fragment.findNavController
 import com.example.zodiactableapp.BuildConfig
 import com.example.zodiactableapp.R
 import com.example.zodiactableapp.model.Zodiac
-import com.example.zodiactableapp.model.ZodiacNumberTables
 import com.example.zodiactableapp.shared.BetOrder
 import com.example.zodiactableapp.shared.BetSharedViewModel
 import com.example.zodiactableapp.shared.GroupLevelEngine
@@ -39,8 +38,9 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     private lateinit var containerOrders: LinearLayout
 
     // ======= 正在创建中的“新大单” =======
+    private val groupsPerOrder = BetSharedViewModel.GROUPS_PER_ORDER
     private val buildingGroupIds = mutableListOf<Int>()
-    private val buildingInitLevels = mutableMapOf<Int, Int>() // 1..9
+    private val buildingInitLevels = mutableMapOf<Int, Int>() // 1..15
 
     /** s1/s2 构建：只保留一张单，禁止新增、删除、改单号/改内容 */
     private val singleOrderMode = BuildConfig.SEED_ORDER_NO in 1..2
@@ -61,8 +61,8 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         }
 
         btnSelectGroup.setOnClickListener {
-            if (buildingGroupIds.size >= 15) {
-                toast("当前新单已满 15 组，将自动生成")
+            if (buildingGroupIds.size >= groupsPerOrder) {
+                toast("当前新单已满 $groupsPerOrder 组，将自动生成")
                 commitNewOrderIfReady()
                 return@setOnClickListener
             }
@@ -83,9 +83,9 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                 pickInitialLevel(defaultLv = 1) { lv ->
                     buildingGroupIds.add(gid)
                     buildingInitLevels[gid] = lv
-                    toast("已加入：${members.joinToString("、") { it.name }}  Lv$lv  （${buildingGroupIds.size}/15）")
+                    toast("已加入：${members.joinToString("、") { it.name }}  Lv$lv  （${buildingGroupIds.size}/$groupsPerOrder）")
 
-                    if (buildingGroupIds.size == 15) {
+                    if (buildingGroupIds.size == groupsPerOrder) {
                         commitNewOrderIfReady()
                     } else {
                         refreshTitle()
@@ -133,8 +133,8 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     }
 
     private fun commitNewOrderIfReady() {
-        if (buildingGroupIds.size != 15) {
-            toast("当前新单不足 15 组：${buildingGroupIds.size}/15")
+        if (buildingGroupIds.size != groupsPerOrder) {
+            toast("当前新单不足 $groupsPerOrder 组：${buildingGroupIds.size}/$groupsPerOrder")
             return
         }
 
@@ -167,7 +167,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             return
         }
         val building = buildingGroupIds.size
-        tvSelectedGroups.text = "大组列表（${orders.size} 单） | 正在创建：$building/15"
+        tvSelectedGroups.text = "大组列表（${orders.size} 单） | 正在创建：$building/$groupsPerOrder"
     }
 
     private fun renderOrders(orders: List<BetOrder>) {
@@ -192,7 +192,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
 
             val checked = (order.id == selectedId)
             tvTitle.text = (if (checked) "✅ " else "") + "第 ${order.orderNo} 号单"
-            tvSub.text = "创建日期：${order.createdDateKey}   组数：${order.groupIds.size}/15\n当前等级($dateKey)：${order.groupIds.take(6).joinToString { "Lv${sharedVM.getGroupLevelForDate(it, dateKey)}" }}"
+            tvSub.text = "创建日期：${order.createdDateKey}   组数：${order.groupIds.size}/$groupsPerOrder\n当前等级($dateKey)：${order.groupIds.take(6).joinToString { "Lv${sharedVM.getGroupLevelForDate(it, dateKey)}" }}"
 
             btnView.setOnClickListener {
                 sharedVM.selectOrder(order.id)
@@ -229,7 +229,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         }
     }
 
-    /** 单张单模式：直接展开这一单的 15 个小组，并显示号码与当日金额 */
+    /** 单张单模式：直接展开这一单的 12 个小组，并显示当日金额 */
     private fun renderSingleOrderExpanded(orders: List<BetOrder>) {
         val order = orders.minByOrNull { it.orderNo } ?: return
         val dateKey = sharedVM.getSelectedDate()
@@ -242,14 +242,13 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             )
         )
 
-        order.groupIds.take(15).forEachIndexed { index, gid ->
+        order.groupIds.take(groupsPerOrder).forEachIndexed { index, gid ->
             val members = sharedVM.getGroupMembers(gid)
             containerOrders.addView(
                 buildGroupCard(
                     index = index,
                     level = sharedVM.getGroupLevelForDate(gid, dateKey),
                     zodiacs = members.toList(),
-                    showNumbers = true,
                     onEdit = { showGroupLevelDialog(order, index, gid) },
                     amountPerZodiac = sharedVM.amountPerZodiacForDate(gid, dateKey)
                 )
@@ -283,7 +282,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                 setTypeface(typeface, Typeface.BOLD)
             })
             addView(TextView(context).apply {
-                text = "创建日期：${order.createdDateKey}   组数：${order.groupIds.size}/15"
+                text = "创建日期：${order.createdDateKey}   组数：${order.groupIds.size}/$groupsPerOrder"
                 textSize = 13f
                 setTextColor(Color.rgb(110, 110, 110))
                 layoutParams = LinearLayout.LayoutParams(
@@ -305,7 +304,6 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     }
 
     private fun showOrderDialog(order: BetOrder, editable: Boolean) {
-        val showNumbers = resources.getBoolean(R.bool.show_zodiac_numbers)
         val dateKey = sharedVM.getSelectedDate()
 
         val root = ScrollView(requireContext())
@@ -325,7 +323,6 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                     index = index,
                     level = sharedVM.getGroupLevelForDate(gid, dateKey),
                     zodiacs = sharedVM.getGroupMembers(gid).toList(),
-                    showNumbers = showNumbers,
                     onEdit = onEdit
                 )
             )
@@ -342,7 +339,6 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         index: Int,
         level: Int,
         zodiacs: List<Zodiac>,
-        showNumbers: Boolean,
         onEdit: (() -> Unit)?,
         amountPerZodiac: Int? = null
     ): LinearLayout {
@@ -423,17 +419,6 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                 setTypeface(typeface, Typeface.BOLD)
                 gravity = Gravity.CENTER
             })
-            if (showNumbers) {
-                cell.addView(TextView(requireContext()).apply {
-                    text = ZodiacNumberTables.numbersFor(
-                        zodiac,
-                        ZodiacNumberTables.groupIndexForProfile(sharedVM.getCurrentProfileId())
-                    ).joinToString(" ")
-                    textSize = 14f
-                    setTextColor(Color.rgb(130, 130, 130))
-                    gravity = Gravity.CENTER
-                })
-            }
             grid.addView(cell)
         }
         card.addView(grid)

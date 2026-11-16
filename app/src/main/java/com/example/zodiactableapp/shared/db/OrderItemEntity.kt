@@ -22,7 +22,7 @@ import androidx.room.Index
 )
 data class OrderItemEntity(
     val orderId: Long,
-    val pos: Int,       // 1..15
+    val pos: Int,       // 1..12
     val groupId: Int,   // 0..494
-    val initLevel: Int  // 1..9
+    val initLevel: Int  // 1..15
 )

@@ -130,13 +130,13 @@
             android:overScrollMode="never" />
     </HorizontalScrollView>
 
-    <!-- 生肖号码对照表（仅 app1 显示；全表格形式） -->
+    <!-- 生肖对照表（仅 app1 显示；只显示生肖，不显示号码） -->
     <TextView
         android:id="@+id/tvZodiacNumberTitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
-        android:text="生肖号码对照"
+        android:text="生肖对照"
         android:textSize="15sp"
         android:textStyle="bold" />
 
