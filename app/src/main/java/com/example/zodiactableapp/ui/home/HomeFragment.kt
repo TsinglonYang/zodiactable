@@ -18,7 +18,6 @@ import androidx.navigation.fragment.findNavController
 import com.example.zodiactableapp.BuildConfig
 import com.example.zodiactableapp.R
 import com.example.zodiactableapp.model.Zodiac
-import com.example.zodiactableapp.model.ZodiacNumberTables
 import com.example.zodiactableapp.shared.BetOrder
 import com.example.zodiactableapp.shared.BetSharedViewModel
 import com.example.zodiactableapp.shared.GroupLevelEngine
@@ -40,7 +39,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
 
     // ======= 正在创建中的“新大单” =======
     private val buildingGroupIds = mutableListOf<Int>()
-    private val buildingInitLevels = mutableMapOf<Int, Int>() // 1..9
+    private val buildingInitLevels = mutableMapOf<Int, Int>() // 1..20
 
     /** s1/s2 构建：只保留一张单，禁止新增、删除、改单号/改内容 */
     private val singleOrderMode = BuildConfig.SEED_ORDER_NO in 1..2
@@ -249,7 +248,6 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                     index = index,
                     level = sharedVM.getGroupLevelForDate(gid, dateKey),
                     zodiacs = members.toList(),
-                    showNumbers = true,
                     onEdit = { showGroupLevelDialog(order, index, gid) },
                     amountPerZodiac = sharedVM.amountPerZodiacForDate(gid, dateKey)
                 )
@@ -305,7 +303,6 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     }
 
     private fun showOrderDialog(order: BetOrder, editable: Boolean) {
-        val showNumbers = resources.getBoolean(R.bool.show_zodiac_numbers)
         val dateKey = sharedVM.getSelectedDate()
 
         val root = ScrollView(requireContext())
@@ -325,7 +322,6 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                     index = index,
                     level = sharedVM.getGroupLevelForDate(gid, dateKey),
                     zodiacs = sharedVM.getGroupMembers(gid).toList(),
-                    showNumbers = showNumbers,
                     onEdit = onEdit
                 )
             )
@@ -342,7 +338,6 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         index: Int,
         level: Int,
         zodiacs: List<Zodiac>,
-        showNumbers: Boolean,
         onEdit: (() -> Unit)?,
         amountPerZodiac: Int? = null
     ): LinearLayout {
@@ -423,17 +418,6 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                 setTypeface(typeface, Typeface.BOLD)
                 gravity = Gravity.CENTER
             })
-            if (showNumbers) {
-                cell.addView(TextView(requireContext()).apply {
-                    text = ZodiacNumberTables.numbersFor(
-                        zodiac,
-                        ZodiacNumberTables.groupIndexForProfile(sharedVM.getCurrentProfileId())
-                    ).joinToString(" ")
-                    textSize = 14f
-                    setTextColor(Color.rgb(130, 130, 130))
-                    gravity = Gravity.CENTER
-                })
-            }
             grid.addView(cell)
         }
         card.addView(grid)

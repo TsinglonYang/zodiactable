@@ -36,19 +36,20 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
     private lateinit var adapter: ZodiacTableAdapter
     private val zodiacList = Zodiac.values().toList()
 
-    // 9级：第一类（不含当年生肖的小组）
+    // 等级金额：第一类（不含当年生肖的小组），1..20 级
     private val amountsTypeA = intArrayOf(
-        10, 15, 25, 35, 55,
-        80, 125, 190, 290, 440,
-        665, 1010, 1530, 2320, 3530
-
+        1, 1, 2, 5, 8,
+        12, 20, 32, 50, 78,
+        118, 180, 275, 415, 630,
+        950, 1450, 2200, 3350, 5100
     )
 
-    // 9级：第二类（含当年生肖的小组）
+    // 等级金额：第二类（含当年生肖的小组），1..18 级
     private val amountsTypeB = intArrayOf(
-        10, 20, 30, 45, 70,
-        110, 175, 270, 425, 670,
-        1045, 1640, 2570, 4050, 6500
+        1, 1, 2, 5, 8,
+        15, 23, 40, 63, 100,
+        157, 246, 387, 610, 948,
+        1490, 2330, 3668
     )
 
     private lateinit var headerRow: LinearLayout
@@ -181,7 +182,7 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
 
         groupIds.take(15).forEachIndexed { index, gid ->
             val members = sharedVM.getGroupMembers(gid)
-            val level = sharedVM.getGroupLevelForDate(gid, dateKey) // 1..9
+            val level = sharedVM.getGroupLevelForDate(gid, dateKey) // 1..20
             val money = moneyForLevel(level, members, yearZodiac)
 
             val values = MutableList<Int?>(zodiacList.size) { null }
@@ -209,10 +210,10 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
     }
 
     private fun moneyForLevel(level: Int, members: Set<Zodiac>, yearZodiac: Zodiac?): Int {
-        val lv = level.coerceIn(GroupLevelEngine.MIN_LEVEL, GroupLevelEngine.MAX_LEVEL)
-        val idx = lv - 1
         val useB = (yearZodiac != null && members.contains(yearZodiac))
-        return if (useB) amountsTypeB[idx] else amountsTypeA[idx]
+        val arr = if (useB) amountsTypeB else amountsTypeA
+        // B 类只到 18 级：Lv19-20 按 18 级金额封顶
+        return arr[(level - 1).coerceIn(0, arr.lastIndex)]
     }
 
     // ===== 表头 =====

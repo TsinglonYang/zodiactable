@@ -27,6 +27,10 @@ local.properties
 
 # 签名密钥配置（含密码，不入库）
 keystore.properties
+keystore*.properties
+
+# 本地导出的 APK / 截图
+/exports/
 
 # apksigner v4 签名副产物
 *.idsig

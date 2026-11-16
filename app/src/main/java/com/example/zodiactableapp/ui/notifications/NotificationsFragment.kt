@@ -18,7 +18,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.zodiactableapp.R
 import com.example.zodiactableapp.model.Zodiac
-import com.example.zodiactableapp.model.ZodiacNumberTables
 import com.example.zodiactableapp.shared.BetSharedViewModel
 import com.example.zodiactableapp.shared.GroupLevelEngine
 import com.example.zodiactableapp.ui.localizedDatePickerContext
@@ -66,18 +65,20 @@ class NotificationsFragment : Fragment(R.layout.fragment_notifications) {
 
     private val zodiacList = Zodiac.values().toList()
 
-    // 1–9级：第一类
+    // 等级金额：第一类，1..20 级
     private val amountA = intArrayOf(
-        10, 15, 25, 35, 55,
-        80, 125, 190, 290, 440,
-        665, 1010, 1530, 2320, 3530
+        1, 1, 2, 5, 8,
+        12, 20, 32, 50, 78,
+        118, 180, 275, 415, 630,
+        950, 1450, 2200, 3350, 5100
     )
 
-    // 1–9级：第二类（当年生肖在该小组中）
+    // 等级金额：第二类（当年生肖在该小组中），1..18 级
     private val amountB = intArrayOf(
-        10, 20, 30, 45, 70,
-        110, 175, 270, 425, 670,
-        1045, 1640, 2570, 4050, 6500
+        1, 1, 2, 5, 8,
+        15, 23, 40, 63, 100,
+        157, 246, 387, 610, 948,
+        1490, 2330, 3668
     )
 
     private var selectedDraw: Zodiac = Zodiac.values()[0]
@@ -259,10 +260,10 @@ class NotificationsFragment : Fragment(R.layout.fragment_notifications) {
         val orderCount = orders.size
         val adjustedSubtotalCols = LongArray(zodiacList.size) { 0L }
         for (i in zodiacList.indices) {
-            adjustedSubtotalCols[i] = subtotalCols[i] - orderCount.toLong() * 50L
+            adjustedSubtotalCols[i] = subtotalCols[i] - orderCount.toLong() * 5L
         }
 
-        // 小计：在原始列汇总基础上减去 50 * 单数
+        // 小计：在原始列汇总基础上减去 5 * 单数
         rows.add(
             SummaryTableRow(
                 label = "小计",
@@ -290,14 +291,14 @@ class NotificationsFragment : Fragment(R.layout.fragment_notifications) {
         val subtotalAll = adjustedSubtotalCols.sum()
         val totalAll = totalCols.sum()
         tvFormulaHint.text =
-            "单数=$orderCount｜小计总额=￥$subtotalAll｜合计总额=￥$totalAll（普通*4，当年生肖列*5；均先减单数*50）"
+            "单数=$orderCount｜小计总额=￥$subtotalAll｜合计总额=￥$totalAll（普通*4，当年生肖列*5；均先减单数*5）"
     }
 
     private fun moneyByLevel(level: Int, members: Set<Zodiac>, yearZodiac: Zodiac): Int {
-        val lv = level.coerceIn(GroupLevelEngine.MIN_LEVEL, GroupLevelEngine.MAX_LEVEL)
         val useB = members.contains(yearZodiac)
         val arr = if (useB) amountB else amountA
-        return arr[lv - 1]
+        // B 类只到 18 级：Lv19-20 按 18 级金额封顶
+        return arr[(level - 1).coerceIn(0, arr.lastIndex)]
     }
 
     // ====================== Spinner 初始化 ======================
@@ -409,14 +410,6 @@ class NotificationsFragment : Fragment(R.layout.fragment_notifications) {
                     text = z.name
                     textSize = 14f
                     setTypeface(typeface, android.graphics.Typeface.BOLD)
-                })
-                cell.addView(TextView(requireContext()).apply {
-                    text = ZodiacNumberTables.numbersFor(
-                        z,
-                        ZodiacNumberTables.groupIndexForProfile(sharedVM.getCurrentProfileId())
-                    ).joinToString(" ")
-                    textSize = 15f
-                    setTextColor(Color.rgb(60, 60, 60))
                 })
                 row.addView(cell)
             }

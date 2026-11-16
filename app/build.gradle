@@ -15,14 +15,16 @@ android {
     compileSdk 36
 
     defaultConfig {
-        applicationId "com.example.zodiactableapp11"
+        applicationId "com.example.zodiactableapp17"
         minSdk 21
         targetSdk 36
-        versionCode 9
-        versionName "4.0.0"
+        versionCode 10
+        versionName "5.0.0"
 
-        // 0 = 保留全部 2 张默认单；1/2 = 单张单模式（对应 第1/2号单）
+        // 0 = 保留全部默认单；1/2 = 单张单模式（对应 第1/2号单）
         buildConfigField "int", "SEED_ORDER_NO", "0"
+        // 默认整单数量：3 = 三单版；2 = 双单版
+        buildConfigField "int", "SEED_ORDER_COUNT", "3"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -33,65 +35,78 @@ android {
         app1 {
             dimension "edition"
             applicationIdSuffix ".app1"
-            resValue "string", "app_name", "生肖投注助手"
+            resValue "string", "app_name", "3单助手（20级）"
             resValue "bool", "show_zodiac_numbers", "true"
         }
         app2 {
             dimension "edition"
             applicationIdSuffix ".app2"
-            resValue "string", "app_name", "生肖投注助手"
+            resValue "string", "app_name", "3单助手（20级）"
         }
         app3 {
             dimension "edition"
             applicationIdSuffix ".app3"
-            resValue "string", "app_name", "生肖投注助手"
+            resValue "string", "app_name", "3单助手（20级）"
         }
         app4 {
             dimension "edition"
             applicationIdSuffix ".app4"
-            resValue "string", "app_name", "生肖投注助手"
+            resValue "string", "app_name", "3单助手（20级）"
         }
         app5 {
             dimension "edition"
             applicationIdSuffix ".app5"
-            resValue "string", "app_name", "生肖投注助手"
+            resValue "string", "app_name", "3单助手（20级）"
         }
         app6 {
             dimension "edition"
             applicationIdSuffix ".app6"
-            resValue "string", "app_name", "生肖投注助手"
+            resValue "string", "app_name", "3单助手（20级）"
         }
         app7 {
             dimension "edition"
             applicationIdSuffix ".app7"
-            resValue "string", "app_name", "生肖投注助手"
+            resValue "string", "app_name", "3单助手（20级）"
         }
         app8 {
             dimension "edition"
             applicationIdSuffix ".app8"
-            resValue "string", "app_name", "生肖投注助手"
+            resValue "string", "app_name", "3单助手（20级）"
         }
         app9 {
             dimension "edition"
             applicationIdSuffix ".app9"
-            resValue "string", "app_name", "生肖投注助手"
+            resValue "string", "app_name", "3单助手（20级）"
         }
         app10 {
             dimension "edition"
             applicationIdSuffix ".app10"
-            resValue "string", "app_name", "生肖投注助手"
+            resValue "string", "app_name", "3单助手（20级）"
         }
-        // 双单版：两个独立的单张单应用，各保留对应的一张默认单
+        // 三单版：包名与之前的 app1-app10、s1-s2 均不冲突
+        app11 {
+            dimension "edition"
+            applicationIdSuffix ".app11"
+            resValue "string", "app_name", "三单助手（20级）"
+        }
+        // 双单版：默认播种 v4.0.0 的两张整单
+        app12 {
+            dimension "edition"
+            applicationIdSuffix ".app12"
+            resValue "string", "app_name", "双单助手（20级）"
+            buildConfigField "int", "SEED_ORDER_COUNT", "2"
+        }
+        // 单张单应用：各保留对应的一张默认单
         s1 {
             dimension "edition"
             applicationIdSuffix ".s1"
-            resValue "string", "app_name", "双单·壹"
+            resValue "string", "app_name", "三单·壹"
             buildConfigField "int", "SEED_ORDER_NO", "1"
         }
         s2 {
             dimension "edition"
             applicationIdSuffix ".s2"
-            resValue "string", "app_name", "双单·贰"
+            resValue "string", "app_name", "三单·贰"
             buildConfigField "int", "SEED_ORDER_NO", "2"
         }
     }

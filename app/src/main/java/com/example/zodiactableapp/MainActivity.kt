@@ -70,12 +70,6 @@ class MainActivity : AppCompatActivity() {
         showProfileLauncher()
         setupBackHandling()
         applyInsets()
-
-        binding.btnNumberValueTable.setOnClickListener { showNumberValueDatePicker() }
-
-        binding.btnDrawNumber.setOnClickListener { showDrawNumberPicker() }
-
-        binding.btnDrawHistory.setOnClickListener { showDrawHistory() }
     }
 
     private fun showDrawNumberPicker() {
